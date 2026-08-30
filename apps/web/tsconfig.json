@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,27 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@pcs/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@pcs/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@pcs/db/schema": [
+        "../../packages/db/src/schema.ts"
+      ],
+      "@pcs/pack-engine": [
+        "../../packages/pack-engine/src/index.ts"
+      ],
+      "@pcs/economy-engine": [
+        "../../packages/economy-engine/src/index.ts"
+      ],
+      "@pcs/card-data": [
+        "../../packages/card-data/src/index.ts"
+      ]
     }
   },
   "include": [
@@ -30,5 +54,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
