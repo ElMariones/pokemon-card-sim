@@ -1,0 +1,45 @@
+{
+  "name": "pokemon-card-sim",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Pokemon TCG Collector Simulator - a collection-management and card-market simulator with pack opening as the emotional centerpiece.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace=@pcs/web",
+    "build": "npm run build --workspace=@pcs/web",
+    "start": "npm run start --workspace=@pcs/web",
+    "lint": "npm run lint --workspace=@pcs/web",
+    "typecheck": "tsc --build --verbose",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate --config=packages/db/drizzle.config.ts",
+    "db:push": "tsx scripts/db/push.ts",
+    "db:reset": "tsx scripts/db/reset.ts",
+    "data:sets": "tsx scripts/import/import-sets.ts",
+    "data:cards": "tsx scripts/import/import-cards.ts",
+    "data:prices": "tsx scripts/import/import-prices.ts",
+    "data:all": "npm run data:sets && npm run data:cards && npm run data:prices",
+    "data:validate": "tsx scripts/validate/validate-data.ts",
+    "simulate": "tsx scripts/simulate/simulate-packs.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "drizzle-kit": "^0.31.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.18.20": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

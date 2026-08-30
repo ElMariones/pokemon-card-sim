@@ -1,0 +1,18 @@
+{
+  "name": "@pcs/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "dependencies": {
+    "@pcs/shared": "*",
+    "@electric-sql/pglite": "^0.5.8",
+    "@neondatabase/serverless": "^1.0.1",
+    "drizzle-orm": "^0.45.2"
+  }
+}

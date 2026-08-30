@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@pcs/shared": ["./packages/shared/src/index.ts"],
+      "@pcs/db": ["./packages/db/src/index.ts"],
+      "@pcs/db/schema": ["./packages/db/src/schema.ts"],
+      "@pcs/pack-engine": ["./packages/pack-engine/src/index.ts"],
+      "@pcs/economy-engine": ["./packages/economy-engine/src/index.ts"],
+      "@pcs/card-data": ["./packages/card-data/src/index.ts"]
+    }
+  }
+}

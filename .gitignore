@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.DS_Store
+*.pem
+.env
+.env*.local
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+
+# Local PGlite database
+data/pgdata/
+
+# Raw imported source data (rebuildable via npm run data:all)
+data/raw/
