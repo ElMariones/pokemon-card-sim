@@ -10,6 +10,7 @@ import { RaritySymbol } from "@/components/RaritySymbol";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardDetail } from "@/components/CardDetail";
 import { usePlayer } from "@/components/PlayerProvider";
+import { usePreservedScroll, useQueryState } from "@/lib/nav-state";
 import type { Cents, RarityTier } from "@pcs/shared";
 
 interface BinderCard {
@@ -29,10 +30,11 @@ type Filter = "all" | "owned" | "missing";
 export default function SetPage({ params }: { params: Promise<{ setId: string }> }) {
   const { setId } = use(params);
   const { player, setCash, refresh } = usePlayer();
+  usePreservedScroll();
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [binder, setBinder] = useState<BinderCard[]>([]);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useQueryState("filter", "all");
+  const [search, setSearch] = useQueryState("q", "");
   const [packPrice, setPackPrice] = useState<number | null>(null);
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);

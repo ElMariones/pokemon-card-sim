@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { PackOpening, type OpeningView } from "@/components/PackOpening";
 import { usePlayer } from "@/components/PlayerProvider";
+import { usePreservedScroll, useQueryState } from "@/lib/nav-state";
 import { ERAS, type Cents } from "@pcs/shared";
 import { ERA_LABEL } from "@pcs/card-data/era";
 
@@ -22,8 +24,9 @@ export default function PacksPage() {
   const [opening, setOpening] = useState<OpeningView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [era, setEra] = useState("");
+  const [q, setQ] = useQueryState("q", "");
+  const [era, setEra] = useQueryState("era", "");
+  usePreservedScroll();
 
   useEffect(() => {
     (async () => {
@@ -161,6 +164,7 @@ export default function PacksPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       <Link
                         href={`/set/${s.id}`}
+                        scroll={false}
                         className="text-manila-3 hover:text-brass rounded-pane px-2 py-2 text-xs tracking-wide uppercase transition"
                       >
                         Contents

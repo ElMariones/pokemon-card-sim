@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { money, relativeTime } from "@/lib/format";
 import { usePlayer } from "@/components/PlayerProvider";
 import { ListCardDialog } from "@/components/ListCardDialog";
+import { usePreservedScroll } from "@/lib/nav-state";
 import type { Cents } from "@pcs/shared";
 
 interface Listing {
@@ -40,6 +41,7 @@ function waitLabel(seconds: number): string {
 
 export default function MarketPage() {
   const { refresh } = usePlayer();
+  usePreservedScroll();
   const [active, setActive] = useState<Listing[]>([]);
   const [sold, setSold] = useState<Sold[]>([]);
   const [justSold, setJustSold] = useState<Sold[]>([]);

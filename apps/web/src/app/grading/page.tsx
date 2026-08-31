@@ -6,6 +6,7 @@ import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { usePlayer } from "@/components/PlayerProvider";
+import { usePreservedScroll, useQueryState } from "@/lib/nav-state";
 import type { Cents } from "@pcs/shared";
 
 interface Submission {
@@ -31,12 +32,13 @@ function bulkFee(singleFee: number, n: number): number {
 
 export default function GradingPage() {
   const { player, refresh, setCash: setHeaderCash } = usePlayer();
+  usePreservedScroll();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [owned, setOwned] = useState<OwnedCard[]>([]);
   const [picked, setPicked] = useState<OwnedCard[]>([]);
   const [cash, setCash] = useState<number | null>(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useQueryState("q", "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const effectiveCash = player?.cash ?? cash;
@@ -164,7 +166,7 @@ export default function GradingPage() {
 
             {owned.length === 0 ? (
               <p className="text-manila-3 text-sm">
-                Nothing to grade yet. <Link href="/" className="text-brass underline">Open a pack.</Link>
+                Nothing to grade yet. <Link href="/" scroll={false} className="text-brass underline">Open a pack.</Link>
               </p>
             ) : (
               <>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo, Instrument_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { AppHeader } from "@/components/AppHeader";
 import { PageTransition } from "@/components/PageTransition";
@@ -39,7 +40,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <PlayerProvider>
           <AppHeader />
           <main id="main" className="vitrine-ambient flex-1">
-            <PageTransition>{children}</PageTransition>
+            <Suspense fallback={null}>
+              <PageTransition>{children}</PageTransition>
+            </Suspense>
           </main>
         </PlayerProvider>
       </body>

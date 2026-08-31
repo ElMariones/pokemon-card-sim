@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
@@ -29,7 +29,9 @@ const NAV = [
 export function AppHeader() {
   const { player, progression, collectionCount } = usePlayer();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const canGoBack = pathname !== "/";
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -37,8 +39,26 @@ export function AppHeader() {
   return (
     <header className="border-seam/70 bg-ink/85 sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push("/");
+          }}
+          aria-label="Go back"
+          className={cn(
+            "grid h-7 w-7 place-items-center rounded-pane text-sm transition",
+            canGoBack
+              ? "text-manila hover:bg-vitrine-3 ring-seam ring-1"
+              : "text-manila-3 ring-seam cursor-not-allowed ring-1 opacity-40",
+          )}
+          disabled={!canGoBack}
+        >
+          ←
+        </button>
         <Link
           href="/"
+          scroll={false}
           className="hover:text-brass flex shrink-0 items-baseline gap-2 transition"
         >
           <span className="t-display text-[15px] tracking-tight">PokeCard</span>
@@ -57,6 +77,7 @@ export function AppHeader() {
               <Link
                 key={item.href}
                 href={item.href}
+                scroll={false}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition",
@@ -110,6 +131,7 @@ export function AppHeader() {
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  scroll={false}
                   onClick={() => setOpen(false)}
                   aria-current={isActive(item.href) ? "page" : undefined}
                   className={cn(

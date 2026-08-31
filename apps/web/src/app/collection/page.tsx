@@ -9,6 +9,7 @@ import { CardDetail } from "@/components/CardDetail";
 import { GradedSlab } from "@/components/GradedSlab";
 import { RaritySymbol } from "@/components/RaritySymbol";
 import { usePlayer } from "@/components/PlayerProvider";
+import { usePreservedScroll, useQueryState } from "@/lib/nav-state";
 import { RARITY_TIERS, CONDITION_LABEL, type Cents, type RarityTier } from "@pcs/shared";
 
 interface Item {
@@ -38,6 +39,7 @@ const SORTS = [
 
 export default function CollectionPage() {
   const { refresh } = usePlayer();
+  usePreservedScroll();
   const [items, setItems] = useState<Item[]>([]);
   const [facets, setFacets] = useState<Facets | null>(null);
   const [total, setTotal] = useState(0);
@@ -50,15 +52,20 @@ export default function CollectionPage() {
   const [dupeBusy, setDupeBusy] = useState(false);
   const [dupeResult, setDupeResult] = useState<{ soldCount: number; proceeds: number } | null>(null);
 
-  const [q, setQ] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
-  const [setId, setSetId] = useState("");
-  const [rarity, setRarity] = useState("");
-  const [condition, setCondition] = useState("");
-  const [only, setOnly] = useState("");
-  const [sort, setSort] = useState<string>("acquired");
-  const [dir, setDir] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
+  const [q, setQ] = useQueryState("q", "");
+  const [debouncedQ, setDebouncedQ] = useState(q);
+  const [setId, setSetId] = useQueryState("set", "");
+  const [rarity, setRarity] = useQueryState("rarity", "");
+  const [condition, setCondition] = useQueryState("cond", "");
+  const [only, setOnly] = useQueryState("only", "");
+  const [sort, setSort] = useQueryState("sort", "acquired");
+  const [dir, setDir] = useQueryState("dir", "desc");
+  const [pageStr, setPageStr] = useQueryState("page", "1");
+  const page = Math.max(1, parseInt(pageStr, 10) || 1);
+  const setPage = useCallback((next: number | ((p: number) => number)) => {
+    const resolved = typeof next === "function" ? (next as (p: number) => number)(page) : next;
+    setPageStr(String(Math.max(1, resolved)));
+  }, [page, setPageStr]);
 
   // Typing should not fire a request per keystroke.
   useEffect(() => {
@@ -223,7 +230,7 @@ export default function CollectionPage() {
         />
         <button
           type="button"
-          onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))}
+          onClick={() => setDir(dir === "asc" ? "desc" : "asc")}
           aria-label={dir === "asc" ? "Sort ascending" : "Sort descending"}
           className="text-manila-2 ring-seam hover:text-manila rounded-pane px-2.5 py-2 text-xs ring-1"
         >

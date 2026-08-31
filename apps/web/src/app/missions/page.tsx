@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { LevelBadge } from "@/components/LevelBadge";
 import { usePlayer } from "@/components/PlayerProvider";
+import { usePreservedScroll } from "@/lib/nav-state";
 import type { Cents } from "@pcs/shared";
 
 interface Mission {
@@ -27,6 +28,7 @@ const CADENCE_LABEL: Record<string, string> = {
 
 export default function MissionsPage() {
   const { refresh, setCash: setHeaderCash } = usePlayer();
+  usePreservedScroll();
   const [prog, setProg] = useState<Progression | null>(null);
   const [cash, setCash] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
