@@ -7,6 +7,7 @@ import { money } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardTile } from "./CardTile";
 import { RaritySymbol } from "./RaritySymbol";
+import SlidingCards from "./lightswind/sliding-cards";
 import { REVEAL_PROFILE, CONFIDENCE_LABEL, type Cents, type RarityTier, type Confidence } from "@pcs/shared";
 
 export interface OpenedCardView {
@@ -117,13 +118,16 @@ export function PackOpening({
     if (index >= cards.length && phase === "revealing") setPhase("summary");
   }, [index, cards.length, phase]);
 
+  // Sliding Cards is user-driven (swipe/click); auto dwell is disabled to keep
+  // the 3D stack and the progress dots in sync. User can still press Space/Next
+  // or swipe; Skip jumps to summary. If you want timed auto-reveal, re-enable:
+  // const dwell = reduceMotion ? 260 : DWELL_MS[REVEAL_PROFILE[card.rarityTier]];
+  // timer.current = setTimeout(advance, dwell);
   useEffect(() => {
     if (phase !== "revealing" || index < 0 || index >= cards.length) return;
-    const card = cards[index]!;
-    const dwell = reduceMotion ? 260 : DWELL_MS[REVEAL_PROFILE[card.rarityTier]];
-    timer.current = setTimeout(advance, dwell);
+    // keep timer cleared — manual swipe/click drives advance
     return clearTimer;
-  }, [phase, index, cards, advance, reduceMotion]);
+  }, [phase, index, cards]);
 
   useEffect(() => {
     if (!current || !liveRef.current) return;
@@ -148,6 +152,25 @@ export function PackOpening({
   }, [phase, advance, skip, startTear]);
 
   const profit = opening.totalValue - opening.cost;
+
+  const slidingData = useMemo(
+    () =>
+      cards.map((c) => ({
+        id: c.inventoryId,
+        imageUrl: c.imageLarge ?? c.imageSmall,
+        name: c.name,
+        number: c.number,
+        isHit: c.isHit,
+        isReverse: c.isReverse,
+        rarityTier: c.rarityTier,
+        bgClass: c.isHit
+          ? "bg-gradient-to-br from-brass via-amber-500 to-yellow-700"
+          : c.isReverse
+            ? "bg-gradient-to-br from-violet-600 to-indigo-800"
+            : "bg-gradient-to-br from-vitrine-2 to-vitrine-3",
+      })),
+    [cards],
+  );
 
   return (
     <div className="relative flex min-h-[70vh] flex-col items-center justify-center">
@@ -212,17 +235,17 @@ export function PackOpening({
         </motion.div>
       )}
 
-      {phase === "revealing" && current && (
-        <motion.div key="revealing" className="flex w-full flex-col items-center gap-5">
-          {/* the opened pack stays behind as it spills cards — layout transition keeps it */}
+      {phase === "revealing" && (
+        <motion.div key="revealing" className="flex w-full flex-col items-center gap-6">
+          {/* opened pack stays behind */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 0.35, y: 0, scale: 0.88 }}
+            animate={{ opacity: 0.32, y: 0, scale: 0.86 }}
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className="pointer-events-none absolute top-[6%] left-1/2 hidden -translate-x-1/2 sm:block"
+            className="pointer-events-none absolute top-[4%] left-1/2 hidden -translate-x-1/2 sm:block"
             aria-hidden
           >
-            <div className="relative aspect-[2.5/3.5] w-44 opacity-30">
+            <div className="relative aspect-[2.5/3.5] w-40 opacity-30">
               <BoosterPack
                 setName={opening.setName}
                 logoUrl={opening.logoUrl ?? null}
@@ -232,45 +255,41 @@ export function PackOpening({
                 onRip={() => {}}
                 compact
               />
-              {/* slit where cards emerge */}
               <div className="absolute -top-1 inset-x-6 h-2 rounded-full bg-ink blur-[1px]" />
             </div>
           </motion.div>
 
-          {/* staggered card backs peeking before the focused reveal */}
-          <div className="relative flex h-6 items-end justify-center gap-1" aria-hidden>
-            {cards.map((c, i) => (
+          {/* Lightswind Sliding Cards — interactive 3D stack */}
+          <div className="relative">
+            <SlidingCards
+              key={opening.openingId}
+              cards={slidingData}
+              className="w-[300px] h-[420px] sm:w-[340px] sm:h-[480px]"
+              cardSize="w-full h-full"
+              onCardClick={() => {
+                // swipe away top card counts as seeing it
+                const next = Math.min(index + 1, cards.length);
+                setIndex(next);
+                if (next >= cards.length) setPhase("summary");
+              }}
+            />
+            {/* current card meta overlay */}
+            {current && (
               <motion.div
-                key={`peek-${c.inventoryId}`}
-                initial={{ y: 24, opacity: 0, rotate: (i - cards.length / 2) * 2 }}
-                animate={{
-                  y: i <= index ? -6 - i * 1.5 : 0,
-                  opacity: i <= index ? 0 : 0.9 - i * 0.08,
-                  rotate: (i - cards.length / 2) * 1.2,
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 420,
-                  damping: 26,
-                  delay: i * 0.08,
-                }}
-                className={cn(
-                  "h-8 w-5 rounded-[3px] ring-1",
-                  i < index ? "bg-vitrine-3 ring-seam/30" : i === index ? "bg-brass ring-brass" : "bg-vitrine-2 ring-seam",
-                )}
-                style={{ zIndex: cards.length - i }}
-              />
-            ))}
+                key={current.inventoryId + "-meta"}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="pointer-events-none absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink/80 px-3 py-1.5 ring-1 ring-seam backdrop-blur"
+              >
+                <RaritySymbol tier={current.rarityTier} className="h-3 w-3" />
+                <span className="text-xs font-medium text-white">{current.name}</span>
+                <span className="text-manila-3 text-[11px]">#{current.number}</span>
+                <span className="t-num text-brass ml-1 text-xs tabular-nums">{money(current.value)}</span>
+                {current.isHit && <span className="bg-brass text-ink ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase">Hit</span>}
+              </motion.div>
+            )}
           </div>
 
-          <AnimatePresence mode="wait" initial={false}>
-            <RevealCard
-              key={current.inventoryId}
-              card={current}
-              reduceMotion={!!reduceMotion}
-              onAdvance={advance}
-            />
-          </AnimatePresence>
           <div className="flex items-center gap-2" aria-hidden>
             {cards.map((c, i) => (
               <span
@@ -282,9 +301,27 @@ export function PackOpening({
               />
             ))}
           </div>
-          <p className="text-manila-3 text-xs">
-            {index + 1} of {cards.length} · click or press space to speed up
+          <p className="text-manila-3 text-center text-xs">
+            {index >= 0 ? `${Math.min(index + 1, cards.length)} of ${cards.length}` : `Swipe or drag the stack • ${cards.length} cards`}
+            <br />
+            <span className="opacity-70">Tap / swipe top card to slide • Space to advance</span>
           </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={advance}
+              className="ring-seam text-manila hover:ring-brass rounded-pane px-4 py-2 text-xs ring-1 transition"
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              onClick={() => setIndex(cards.length)}
+              className="bg-brass text-ink hover:bg-brass-hot rounded-pane px-5 py-2 text-xs font-semibold transition"
+            >
+              View results
+            </button>
+          </div>
         </motion.div>
       )}
 
