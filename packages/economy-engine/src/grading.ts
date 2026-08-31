@@ -113,7 +113,7 @@ export function rollGrade(company: GradeCompany, condition: Condition, rng: Rng)
  * A low grade is worth LESS than the raw card, because grading a played card
  * certifies that it is played — that is the risk the player is taking.
  */
-const GRADE_MULTIPLIER_BP: Record<GradeCompany, Record<number, Bp>> = {
+export const GRADE_MULTIPLIER_BP: Record<GradeCompany, Record<number, Bp>> = {
   PSA: {
     10: bp(60_000), 9: bp(20_000), 8: bp(11_000), 7: bp(8_000),
     6: bp(6_500), 5: bp(5_500), 4: bp(4_500), 3: bp(3_500), 2: bp(2_500), 1: bp(1_500),

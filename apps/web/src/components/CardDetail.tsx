@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { money } from "@/lib/format";
+import { money, relativeTime } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardFace } from "./CardFace";
 import { GradedSlab } from "./GradedSlab";
@@ -226,7 +226,19 @@ export function CardDetail({
                             )}
                           </p>
                           <p className="text-manila-3 t-mono text-[10px]">
-                            bought {money(c.acquisitionPrice as Cents)}
+                            {/* When a copy entered the collection. The exact
+                                timestamp is on the title, so hovering gives the
+                                precise moment without cluttering the row. */}
+                            <time
+                              dateTime={c.acquiredAt}
+                              title={new Date(c.acquiredAt).toLocaleString()}
+                            >
+                              {relativeTime(c.acquiredAt)}
+                            </time>
+                            {" · "}
+                            {c.acquisitionPrice > 0
+                              ? `bought ${money(c.acquisitionPrice as Cents)}`
+                              : "from a pack"}
                           </p>
                         </div>
                         <div className="text-right">

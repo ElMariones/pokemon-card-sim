@@ -61,18 +61,9 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
     : binder;
 
   return (
-    <div className="vitrine-ambient min-h-full">
-      <header className="border-seam/70 sticky top-0 z-20 border-b bg-ink/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-3.5">
-          <Link href="/" className="t-display text-[15px] tracking-tight hover:text-brass transition">
-            PokeCard
-          </Link>
-          <span className="text-manila-3">/</span>
-          <span className="text-manila-2 truncate text-sm">{completion?.setName ?? setId}</span>
-        </div>
-      </header>
+    <>
 
-      <main id="main" className="mx-auto max-w-7xl px-5 py-8">
+      <div className="mx-auto max-w-7xl px-5 py-8">
         {completion && (
           <>
             <div className="pane mb-8 grid gap-6 p-6 lg:grid-cols-[1fr_auto]">
@@ -189,7 +180,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
             )}
           </>
         )}
-      </main>
+      </div>
 
       {inspecting && (
         <CardDetail
@@ -198,7 +189,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
           onChanged={load}
         />
       )}
-    </div>
+  </>
   );
 }
 

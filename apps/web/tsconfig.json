@@ -43,6 +43,9 @@
       ],
       "@pcs/card-data": [
         "../../packages/card-data/src/index.ts"
+      ],
+      "@pcs/card-data/era": [
+        "../../packages/card-data/src/era.ts"
       ]
     }
   },

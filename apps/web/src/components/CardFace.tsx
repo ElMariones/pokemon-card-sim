@@ -150,8 +150,7 @@ export function CardFace({
           />
         </div>
 
-        {/* Back. Drawn rather than hotlinked: the printed card back is
-            copyrighted artwork, and this is a simulator, not a reproduction. */}
+        {/* Back: the official Pokémon card back. */}
         <div
           className={cn(
             "absolute inset-0 overflow-hidden rounded-card ring-1 ring-seam",
@@ -159,23 +158,23 @@ export function CardFace({
             "bg-[#1b2338]",
           )}
         >
+          <Image
+            src="/card-back.jpg"
+            alt=""
+            fill
+            sizes="(max-width: 640px) 80vw, 420px"
+            className="object-cover"
+          />
+          {/* The same sheen the front gets, so both faces feel like one object. */}
           <div
-            className="absolute inset-0"
+            className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 8px)," +
-                "radial-gradient(120% 90% at 50% 14%, rgba(120,146,224,0.22), transparent 62%)," +
-                "linear-gradient(160deg, #223055 0%, #16203a 55%, #101733 100%)",
+                "radial-gradient(60% 45% at calc((1 - var(--px,0.5)) * 100%) calc(var(--py,0.5) * 100%)," +
+                " rgba(255,255,255,0.16), transparent 68%)",
             }}
             aria-hidden
           />
-          <div className="absolute inset-3 rounded-[8px] ring-1 ring-[#43507a]" aria-hidden />
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="text-center">
-              <p className="t-display text-[#8fa0d8] text-lg tracking-[0.28em]">POKECARD</p>
-              <p className="t-mono mt-1 text-[9px] tracking-[0.3em] text-[#5f6ea8]">SIMULATOR</p>
-            </div>
-          </div>
         </div>
       </div>
 

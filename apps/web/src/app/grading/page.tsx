@@ -95,23 +95,9 @@ export default function GradingPage() {
     (!picked || (picked.marketBasePrice ?? 0) <= t.maxDeclaredValue);
 
   return (
-    <div className="vitrine-ambient min-h-full">
-      <header className="border-seam/70 sticky top-0 z-20 border-b bg-ink/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3.5">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="t-display text-[15px] tracking-tight hover:text-brass transition">
-              PokeCard
-            </Link>
-            <span className="text-manila-3">/</span>
-            <span className="text-manila-2 text-sm">Grading</span>
-          </div>
-          {cash !== null && (
-            <p className="t-num text-brass tabular-nums">{money(cash as Cents)}</p>
-          )}
-        </div>
-      </header>
+    <>
 
-      <main id="main" className="mx-auto max-w-7xl px-5 py-8">
+      <div className="mx-auto max-w-7xl px-5 py-8">
         {error && (
           <p role="alert" className="text-loss ring-loss/40 mb-6 rounded-pane px-4 py-3 text-sm ring-1">
             {error}
@@ -281,8 +267,8 @@ export default function GradingPage() {
             </ul>
           )}
         </section>
-      </main>
-    </div>
+      </div>
+  </>
   );
 }
 

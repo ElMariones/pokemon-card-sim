@@ -1,79 +1,45 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { PackOpening, type OpeningView } from "@/components/PackOpening";
-import { CardTile } from "@/components/CardTile";
-import { CompletionBar } from "@/components/CompletionBar";
-import { LevelBadge } from "@/components/LevelBadge";
-import { CardDetail } from "@/components/CardDetail";
-import { GradedSlab } from "@/components/GradedSlab";
-import type { Cents } from "@pcs/shared";
+import { usePlayer } from "@/components/PlayerProvider";
+import { ERAS, type Cents } from "@pcs/shared";
+import { ERA_LABEL } from "@pcs/card-data/era";
 
-interface Player { id: string; cash: Cents; xp: number; level: number }
 interface SetRow {
   id: string; name: string; series: string; era: string; releaseDate: string;
   cardCount: number; pricedCount: number; avgPrice: number;
-  packPrice: number; packSize: number; pullConfidence: string;
+  packPrice: number; packSize: number;
   logoUrl: string | null; symbolUrl: string | null; openable: boolean;
 }
-interface CollectionItem {
-  inventoryId: string; cardId: string; name: string; number: string;
-  rarityTier: string; imageSmall: string | null; marketBasePrice: number | null;
-  condition: string | null; setName: string;
-  grade: { company: string; numericGrade: number; label: string | null; isBlackLabel: boolean } | null;
-  rawValue: number; value: number; dealerOffer: number;
-}
 
-export default function Home() {
-  const [player, setPlayer] = useState<Player | null>(null);
+export default function PacksPage() {
+  const { player, setCash, refresh } = usePlayer();
   const [sets, setSets] = useState<SetRow[]>([]);
   const [opening, setOpening] = useState<OpeningView | null>(null);
-  const [collection, setCollection] = useState<CollectionItem[]>([]);
-  const [collectionTotal, setCollectionTotal] = useState(0);
-  const [stats, setStats] = useState<{
-    uniqueCards: number; totalCopies: number; portfolioValue: number;
-    setsStarted: number; setsCompleted: number;
-    bestCard: { name: string; value: number; imageSmall: string | null } | null;
-  } | null>(null);
-  const [prog, setProg] = useState<{
-    level: number; title: string; progressBp: number; xpToNext: number | null;
-  } | null>(null);
-  const [inspecting, setInspecting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"packs" | "collection">("packs");
-
-  const loadCollection = useCallback(async () => {
-    const res = await fetch("/api/collection?pageSize=24");
-    if (!res.ok) return;
-    const data = await res.json();
-    setCollection(data.items ?? []);
-    setCollectionTotal(data.total ?? 0);
-    const s = await fetch("/api/collection/stats");
-    if (s.ok) setStats(await s.json());
-  }, []);
+  const [q, setQ] = useState("");
+  const [era, setEra] = useState("");
 
   useEffect(() => {
     (async () => {
-      // /api/me establishes the session cookie, and every other endpoint
-      // requires it. Fetching them in parallel raced on a first visit: the
-      // player did not exist yet, so progression 401'd and the level badge
-      // silently never appeared.
-      const me = await fetch("/api/me").then((r) => r.json());
-      setPlayer(me.player);
-
-      const [s, p] = await Promise.all([
-        fetch("/api/sets?limit=200").then((r) => r.json()),
-        fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
-      ]);
-      if (p) setProg(p);
-      setSets((s.sets ?? []).filter((x: SetRow) => x.openable));
-      await loadCollection();
+      const s = await fetch("/api/sets?limit=200").then((r) => (r.ok ? r.json() : null));
+      if (s) setSets((s.sets ?? []).filter((x: SetRow) => x.openable));
     })();
-  }, [loadCollection]);
+  }, []);
+
+  const visible = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return sets.filter(
+      (s) =>
+        (!era || s.era === era) &&
+        (!term || s.name.toLowerCase().includes(term) || s.id.toLowerCase().includes(term)),
+    );
+  }, [sets, q, era]);
 
   const openPack = async (setId: string) => {
     setBusy(true);
@@ -87,11 +53,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not open pack"); return; }
       setOpening(data);
-      setPlayer((p) => (p ? { ...p, cash: data.balanceAfter } : p));
-      void fetch("/api/progression").then(async (r) => { if (r.ok) setProg(await r.json()); });
-    } finally {
-      setBusy(false);
-    }
+      setCash(data.balanceAfter);
+    } finally { setBusy(false); }
   };
 
   const sell = async (inventoryId: string) => {
@@ -102,103 +65,69 @@ export default function Home() {
     });
     if (!res.ok) return;
     const data = await res.json();
-    setPlayer((p) => (p ? { ...p, cash: data.balanceAfter } : p));
+    setCash(data.balanceAfter);
     setOpening((o) =>
       o ? { ...o, cards: o.cards.filter((c) => c.inventoryId !== inventoryId) } : o,
     );
-    await loadCollection();
   };
 
+  const erasPresent = ERAS.filter((e) => sets.some((s) => s.era === e));
+
   return (
-    <div className="vitrine-ambient min-h-full">
-      <header className="border-seam/70 sticky top-0 z-20 border-b bg-ink/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-3.5">
-          <div className="flex items-baseline gap-3">
-            <span className="t-display text-[15px] tracking-tight">PokeCard</span>
-            <span className="text-manila-3 hidden text-[11px] tracking-[0.2em] uppercase sm:inline">
-              Collector Simulator
-            </span>
+    <div className="mx-auto max-w-7xl px-5 py-8">
+      {error && (
+        <p role="alert" className="text-loss ring-loss/40 mb-6 rounded-pane px-4 py-3 text-sm ring-1">
+          {error}
+        </p>
+      )}
+
+      {opening ? (
+        <PackOpening
+          opening={opening}
+          onDone={() => { setOpening(null); void refresh(); }}
+          onSell={sell}
+        />
+      ) : (
+        <>
+          <div className="mb-6">
+            <h1 className="t-display text-2xl tracking-tight">Choose a pack</h1>
+            <p className="text-manila-2 mt-1 text-sm">
+              {sets.length} sets priced and ready. Pack prices come from what the cards inside
+              are actually worth today.
+            </p>
           </div>
-          <nav className="flex items-center gap-1" aria-label="Sections">
-            {(["packs", "collection"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  "rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition",
-                  tab === t ? "bg-vitrine-3 text-manila" : "text-manila-3 hover:text-manila",
-                )}
-                aria-current={tab === t ? "page" : undefined}
-              >
-                {t}
-                {t === "collection" && collectionTotal > 0 ? (
-                  <span className="text-manila-3 ml-1.5 tabular-nums">{collectionTotal}</span>
-                ) : null}
-              </button>
-            ))}
-            {[
-              { href: "/sealed", label: "Sealed" },
-              { href: "/grading", label: "Grading" },
-              { href: "/missions", label: "Missions" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="text-manila-3 hover:text-manila rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-6">
-            {prog && (
-              <LevelBadge
-                className="hidden sm:flex"
-                level={prog.level}
-                title={prog.title}
-                progressBp={prog.progressBp}
-                xpToNext={prog.xpToNext}
-              />
-            )}
-            <div className="text-right">
-              <p className="t-eyebrow text-manila-3">Cash</p>
-              <p className="t-num text-brass tabular-nums">
-                {player ? money(player.cash) : "—"}
-              </p>
-            </div>
+
+          <div className="pane mb-6 flex flex-wrap items-center gap-2 p-3">
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search sets…"
+              aria-label="Search sets"
+              className="bg-vitrine-3 ring-seam placeholder:text-manila-3 focus:ring-brass min-w-[13rem] flex-1 rounded-pane px-3 py-2 text-sm ring-1 outline-none"
+            />
+            <select
+              aria-label="Filter by era"
+              value={era}
+              onChange={(e) => setEra(e.target.value)}
+              className="bg-vitrine-3 ring-seam focus:ring-brass rounded-pane px-2.5 py-2 text-xs ring-1 outline-none"
+            >
+              <option value="">All eras</option>
+              {erasPresent.map((e) => (
+                <option key={e} value={e}>{ERA_LABEL[e]}</option>
+              ))}
+            </select>
+            <span className="text-manila-3 text-xs tabular-nums">{visible.length} shown</span>
           </div>
-        </div>
-      </header>
 
-      <main id="main" className="mx-auto max-w-7xl px-5 py-8">
-        {error && (
-          <p role="alert" className="text-loss ring-loss/40 mb-6 rounded-pane px-4 py-3 text-sm ring-1">
-            {error}
-          </p>
-        )}
-
-        {opening ? (
-          <PackOpening opening={opening} onDone={() => { setOpening(null); loadCollection(); }} onSell={sell} />
-        ) : tab === "packs" ? (
-          <>
-            <div className="mb-6">
-              <h1 className="t-display text-2xl tracking-tight">Choose a pack</h1>
-              <p className="text-manila-2 mt-1 text-sm">
-                {sets.length} sets priced and ready. Pack prices are derived from what the
-                cards inside are actually worth today.
-              </p>
-            </div>
-
-            {sets.length === 0 ? (
-              <p className="text-manila-3 pane p-8 text-sm">
-                No priced sets yet. Run <code className="t-mono">npm run data:prices</code> to
-                import market prices.
-              </p>
-            ) : (
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {sets.map((s) => (
-                  <li key={s.id} className="pane flex items-center gap-4 p-4">
+          {visible.length === 0 ? (
+            <p className="text-manila-3 pane p-8 text-sm">No sets match that.</p>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visible.map((s) => {
+                const affordable = player === null || player.cash >= s.packPrice;
+                return (
+                  <li key={s.id} className="pane hover:ring-seam-bright flex items-center gap-4 p-4 transition">
                     {s.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={s.logoUrl} alt="" className="h-12 w-20 shrink-0 object-contain" />
@@ -217,127 +146,29 @@ export default function Home() {
                         href={`/set/${s.id}`}
                         className="text-manila-3 hover:text-brass rounded-pane px-2 py-2 text-xs tracking-wide uppercase transition"
                       >
-                        Binder
+                        Contents
                       </Link>
                       <button
                         type="button"
-                        disabled={busy || (player !== null && player.cash < s.packPrice)}
+                        disabled={busy || !affordable}
                         onClick={() => openPack(s.id)}
-                        className="bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam rounded-pane px-3 py-2 text-xs font-semibold tabular-nums ring-1 transition disabled:cursor-not-allowed disabled:opacity-40"
+                        className={cn(
+                          "rounded-pane px-3 py-2 text-xs font-semibold tabular-nums transition",
+                          affordable
+                            ? "bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam ring-1"
+                            : "text-manila-3 ring-seam cursor-not-allowed ring-1",
+                        )}
                         aria-label={`Open a ${s.name} pack for ${money(s.packPrice as Cents)}`}
                       >
                         {money(s.packPrice as Cents)}
                       </button>
                     </div>
                   </li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="mb-6">
-              <h1 className="t-display text-2xl tracking-tight">Collection</h1>
-              <p className="text-manila-2 mt-1 text-sm">
-                {collectionTotal} card{collectionTotal === 1 ? "" : "s"} owned
-                {collectionTotal > collection.length ? ` · showing ${collection.length}` : ""}
-              </p>
-            </div>
-
-            {stats && (
-              <dl className="pane mb-8 grid grid-cols-2 gap-6 p-5 sm:grid-cols-4">
-                <div>
-                  <dt className="t-eyebrow text-manila-3">Portfolio value</dt>
-                  <dd className="t-num text-brass text-lg tabular-nums">
-                    {money(stats.portfolioValue as Cents)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="t-eyebrow text-manila-3">Unique cards</dt>
-                  <dd className="t-num text-lg tabular-nums">{stats.uniqueCards}</dd>
-                </div>
-                <div>
-                  <dt className="t-eyebrow text-manila-3">Sets started</dt>
-                  <dd className="t-num text-lg tabular-nums">{stats.setsStarted}</dd>
-                </div>
-                <div>
-                  <dt className="t-eyebrow text-manila-3">Sets completed</dt>
-                  <dd className="t-num text-lg tabular-nums">{stats.setsCompleted}</dd>
-                </div>
-              </dl>
-            )}
-            {collection.length === 0 ? (
-              <p className="text-manila-3 pane p-8 text-sm">
-                Nothing yet. Open a pack to start your collection.
-              </p>
-            ) : (
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-                {collection.map((c) => (
-                  <li key={c.inventoryId}>
-                    {c.grade ? (
-                      // A graded card reads as a slab everywhere it appears,
-                      // not only on the grading page.
-                      <button
-                        type="button"
-                        onClick={() => setInspecting(c.cardId)}
-                        className="w-full text-left focus-visible:outline-2 focus-visible:outline-brass rounded-[10px]"
-                        aria-label={`${c.name}, graded ${c.grade.company} ${c.grade.numericGrade}. Inspect.`}
-                      >
-                        <GradedSlab
-                          compact
-                          grade={c.grade}
-                          cardName={c.name}
-                          setName={c.setName}
-                          certSeed={c.inventoryId}
-                        >
-                          {c.imageSmall && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={c.imageSmall}
-                              alt=""
-                              loading="lazy"
-                              className="aspect-[2.5/3.5] w-full object-cover"
-                            />
-                          )}
-                        </GradedSlab>
-                        <p className="mt-1.5 truncate text-[12px] font-medium">{c.name}</p>
-                        <p className="t-num text-brass text-[12px] tabular-nums">
-                          {money(c.value as Cents)}
-                          <span className="text-manila-3 ml-1 text-[10px]">
-                            raw {money(c.rawValue as Cents)}
-                          </span>
-                        </p>
-                      </button>
-                    ) : (
-                      <CardTile
-                        name={c.name}
-                        number={c.number}
-                        rarityTier={c.rarityTier as never}
-                        imageUrl={c.imageSmall}
-                        condition={c.condition}
-                        value={c.value as Cents}
-                        onClick={() => setInspecting(c.cardId)}
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </main>
-
-      {inspecting && (
-        <CardDetail
-          cardId={inspecting}
-          onClose={() => setInspecting(null)}
-          onChanged={() => {
-            void loadCollection();
-            void fetch("/api/me").then(async (r) => {
-              if (r.ok) setPlayer((await r.json()).player);
-            });
-          }}
-        />
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );
