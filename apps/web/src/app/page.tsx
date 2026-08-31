@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { PackOpening, type OpeningView } from "@/components/PackOpening";
 import { CardTile } from "@/components/CardTile";
+import { CompletionBar } from "@/components/CompletionBar";
 import type { Cents } from "@pcs/shared";
 
 interface Player { id: string; cash: Cents; xp: number; level: number }
@@ -25,6 +27,11 @@ export default function Home() {
   const [opening, setOpening] = useState<OpeningView | null>(null);
   const [collection, setCollection] = useState<CollectionItem[]>([]);
   const [collectionTotal, setCollectionTotal] = useState(0);
+  const [stats, setStats] = useState<{
+    uniqueCards: number; totalCopies: number; portfolioValue: number;
+    setsStarted: number; setsCompleted: number;
+    bestCard: { name: string; value: number; imageSmall: string | null } | null;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"packs" | "collection">("packs");
@@ -35,6 +42,8 @@ export default function Home() {
     const data = await res.json();
     setCollection(data.items ?? []);
     setCollectionTotal(data.total ?? 0);
+    const s = await fetch("/api/collection/stats");
+    if (s.ok) setStats(await s.json());
   }, []);
 
   useEffect(() => {
@@ -110,6 +119,12 @@ export default function Home() {
                 ) : null}
               </button>
             ))}
+            <Link
+              href="/grading"
+              className="text-manila-3 hover:text-manila rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition"
+            >
+              Grading
+            </Link>
           </nav>
           <div className="text-right">
             <p className="t-eyebrow text-manila-3">Cash</p>
@@ -160,14 +175,22 @@ export default function Home() {
                         {s.releaseDate.slice(0, 4)} · {s.cardCount} cards
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => openPack(s.id)}
-                      className="bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam shrink-0 rounded-pane px-3 py-2 text-xs font-semibold ring-1 transition disabled:opacity-40"
-                    >
-                      Open
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Link
+                        href={`/set/${s.id}`}
+                        className="text-manila-3 hover:text-brass rounded-pane px-2 py-2 text-xs tracking-wide uppercase transition"
+                      >
+                        Binder
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => openPack(s.id)}
+                        className="bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam rounded-pane px-3 py-2 text-xs font-semibold ring-1 transition disabled:opacity-40"
+                      >
+                        Open
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -182,6 +205,29 @@ export default function Home() {
                 {collectionTotal > collection.length ? ` · showing ${collection.length}` : ""}
               </p>
             </div>
+
+            {stats && (
+              <dl className="pane mb-8 grid grid-cols-2 gap-6 p-5 sm:grid-cols-4">
+                <div>
+                  <dt className="t-eyebrow text-manila-3">Portfolio value</dt>
+                  <dd className="t-num text-brass text-lg tabular-nums">
+                    {money(stats.portfolioValue as Cents)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="t-eyebrow text-manila-3">Unique cards</dt>
+                  <dd className="t-num text-lg tabular-nums">{stats.uniqueCards}</dd>
+                </div>
+                <div>
+                  <dt className="t-eyebrow text-manila-3">Sets started</dt>
+                  <dd className="t-num text-lg tabular-nums">{stats.setsStarted}</dd>
+                </div>
+                <div>
+                  <dt className="t-eyebrow text-manila-3">Sets completed</dt>
+                  <dd className="t-num text-lg tabular-nums">{stats.setsCompleted}</dd>
+                </div>
+              </dl>
+            )}
             {collection.length === 0 ? (
               <p className="text-manila-3 pane p-8 text-sm">
                 Nothing yet. Open a pack to start your collection.
