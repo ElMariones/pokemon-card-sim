@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
 import {
-  sets, cards, openings, openingCards, inventoryItems, packTemplates, pullTables,
+  sets, cards, openings, openingCards, inventoryItems, packTemplates, pullTables, grades,
 } from '@pcs/db/schema';
 import { cents, type Cents, type RarityTier } from '@pcs/shared';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@pcs/pack-engine';
 import {
   applyTransaction, InsufficientFundsError, dealerBuyOffer, derivePackPrice,
-  computePrice, rollPackCondition, mulberry32,
+  computePrice, rollPackCondition, mulberry32, gradedValue,
 } from '@pcs/economy-engine';
 import { grantXp } from './progression-service';
 
@@ -370,18 +370,42 @@ export async function sellCard(userId: string, inventoryId: string) {
       id: inventoryItems.id, cardId: inventoryItems.cardId,
       status: inventoryItems.status, condition: inventoryItems.condition,
       basePrice: cards.marketBasePrice, name: cards.name,
+      gradeCompany: grades.gradeCompany,
+      numericGrade: grades.numericGrade,
+      gradeLabel: grades.label,
+      gradeStatus: grades.status,
     })
     .from(inventoryItems)
     .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
+    // A card may have been graded. Only a collected grade counts: one still in
+    // the queue has not been returned to the player.
+    .leftJoin(
+      grades,
+      and(eq(grades.inventoryItemId, inventoryItems.id), eq(grades.status, 'completed')),
+    )
     .where(and(eq(inventoryItems.id, inventoryId), eq(inventoryItems.userId, userId)))
     .limit(1);
 
   if (!item) throw new GameError('You do not own that card', 'not_owned');
   if (item.status !== 'owned') throw new GameError('That card is not available to sell', 'not_sellable');
 
-  const market = computePrice(cents(item.basePrice ?? 0), {
+  const raw = computePrice(cents(item.basePrice ?? 0), {
     condition: (item.condition ?? 'near_mint') as never,
   });
+
+  // A graded card sells at its graded value, not its raw value. Without this
+  // the grading fee bought nothing and the whole system was a money sink with
+  // no upside.
+  const isGraded = item.numericGrade != null && item.gradeStatus === 'completed';
+  const market = isGraded
+    ? gradedValue(raw, {
+        company: item.gradeCompany as never,
+        numericGrade: item.numericGrade!,
+        label: item.gradeLabel ?? '',
+        isBlackLabel: (item.gradeLabel ?? '').includes('Black Label'),
+      })
+    : raw;
+
   const offer = dealerBuyOffer(market);
 
   await db.update(inventoryItems).set({ status: 'sold' }).where(eq(inventoryItems.id, inventoryId));
@@ -392,10 +416,23 @@ export async function sellCard(userId: string, inventoryId: string) {
     amount: offer,
     itemType: 'card',
     itemId: item.cardId ?? undefined,
-    metadata: { inventoryId, marketValue: market, name: item.name },
+    metadata: {
+      inventoryId,
+      marketValue: market,
+      rawValue: raw,
+      name: item.name,
+      graded: isGraded ? `${item.gradeCompany} ${item.numericGrade}` : null,
+    },
   });
 
   await grantXp(userId, 'card_sold');
 
-  return { sold: item.name ?? '', marketValue: market, offer, balanceAfter };
+  return {
+    sold: item.name ?? '',
+    marketValue: market,
+    rawValue: raw,
+    graded: isGraded ? `${item.gradeCompany} ${item.numericGrade}` : null,
+    offer,
+    balanceAfter,
+  };
 }

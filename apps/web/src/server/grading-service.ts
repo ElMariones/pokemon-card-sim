@@ -24,7 +24,13 @@ import { grantXp } from './progression-service';
  * about eight minutes — long enough that the choice to grade costs you
  * liquidity for a while, short enough to matter within one session.
  */
-export const GRADING_SECONDS_PER_HOUR = Number(process.env.GRADING_SECONDS_PER_HOUR ?? 5);
+/**
+ * Read at call time, not at module load. A module-level constant captures
+ * whatever the environment held when the module was first imported, which
+ * silently ignores anything set afterwards — including by a test harness.
+ */
+export const gradingSecondsPerHour = (): number =>
+  Number(process.env.GRADING_SECONDS_PER_HOUR ?? 5);
 
 export interface SubmissionView {
   id: string;
@@ -98,7 +104,7 @@ export async function submitForGrading(
   const result = rollGrade(tier.company, condition, rng);
 
   const readyAt = new Date(
-    Date.now() + tier.turnaroundHours * GRADING_SECONDS_PER_HOUR * 1000,
+    Date.now() + tier.turnaroundHours * gradingSecondsPerHour() * 1000,
   );
   const gradeId = randomUUID();
 
@@ -248,5 +254,5 @@ export async function collectGrade(userId: string, gradeId: string) {
 export const listServiceTiers = () =>
   SERVICE_TIERS.map((t) => ({
     ...t,
-    realSecondsToComplete: t.turnaroundHours * GRADING_SECONDS_PER_HOUR,
+    realSecondsToComplete: t.turnaroundHours * gradingSecondsPerHour(),
   }));
