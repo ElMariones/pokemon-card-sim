@@ -1,212 +1,113 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useState } from "react";
 import { cn } from "@/lib/cn";
 
 export type CardContent = {
   id: string | number;
-  title?: string;
-  description?: string;
-  icon?: React.ReactNode;
-  bgClass?: string;
-  // Pokémon card adaptation
   imageUrl?: string | null;
   name?: string;
-  number?: string;
-  value?: number;
-  rarityTier?: string;
   isHit?: boolean;
-  isReverse?: boolean;
 };
 
 type SlidingCardsProps = {
   cards: CardContent[];
+  activeIndex: number;
+  revealedIndex: number;
   className?: string;
-  cardSize?: string;
-  centerIcon?: React.ReactNode;
-  visibleRange?: number;
-  onCardClick?: (index: number) => void;
+  onReveal: () => void;
+  onAdvance: () => void;
 };
 
-const SlidingCards: React.FC<SlidingCardsProps> = ({
-  cards,
-  className = "",
-  cardSize = "w-24 h-24",
-  onCardClick,
-}) => {
-  const cardStackRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<HTMLElement[]>([]);
+const STACK_OFFSETS = [
+  { x: 0, y: 0, rotate: 0 },
+  { x: -15, y: 10, rotate: -3.1 },
+  { x: 18, y: 18, rotate: 3.6 },
+  { x: -9, y: 27, rotate: -1.8 },
+  { x: 13, y: 34, rotate: 2.4 },
+] as const;
 
-  // stable ref to onCardClick for inside handlers
-  const onCardClickRef = useRef(onCardClick);
-  useEffect(() => { onCardClickRef.current = onCardClick; }, [onCardClick]);
-
-  useEffect(() => {
-    const cardStack = cardStackRef.current;
-    if (!cardStack) return;
-    // capture initial order; do not re-capture on every parent re-render
-    // so swipe-driven DOM reordering is not clobbered by React's reconcile
-    if (cardsRef.current.length === 0) {
-      cardsRef.current = Array.from(cardStack.querySelectorAll(".card")) as HTMLElement[];
-    } else {
-      // if cards length changed (new pack), re-capture
-      const fresh = Array.from(cardStack.querySelectorAll(".card")) as HTMLElement[];
-      if (fresh.length !== cardsRef.current.length) cardsRef.current = fresh;
-    }
-
-    let isSwiping = false;
-    let startX = 0;
-    let currentX = 0;
-    let animationFrameId: number | null = null;
-
-    const getDuration = () => 300;
-    const getActiveCard = () => cardsRef.current[0];
-
-    const updatePositions = () => {
-      cardsRef.current.forEach((card, i) => {
-        const offset = i + 1;
-        card.style.zIndex = `${100 - offset}`;
-        card.style.transform = `perspective(700px) translateZ(${-12 * offset}px) translateY(${7 * offset}px) translateX(0px) rotateY(0deg)`;
-        card.style.opacity = `1`;
-      });
-    };
-
-    const applySwipeStyles = (deltaX: number) => {
-      const card = getActiveCard();
-      if (!card) return;
-      const rotate = deltaX * 0.2;
-      const opacity = 1 - Math.min(Math.abs(deltaX) / 100, 1) * 0.75;
-      card.style.transform = `perspective(700px) translateZ(-12px) translateY(7px) translateX(${deltaX}px) rotateY(${rotate}deg)`;
-      card.style.opacity = `${opacity}`;
-    };
-
-    const handleStart = (clientX: number) => {
-      if (isSwiping) return;
-      isSwiping = true;
-      startX = currentX = clientX;
-      const card = getActiveCard();
-      card && (card.style.transition = "none");
-    };
-
-    const handleMove = (clientX: number) => {
-      if (!isSwiping) return;
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      animationFrameId = requestAnimationFrame(() => {
-        currentX = clientX;
-        const deltaX = currentX - startX;
-        applySwipeStyles(deltaX);
-        if (Math.abs(deltaX) > 50) handleEnd();
-      });
-    };
-
-    const handleEnd = () => {
-      if (!isSwiping) return;
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-
-      const deltaX = currentX - startX;
-      const threshold = 50;
-      const duration = getDuration();
-      const card = getActiveCard();
-
-      if (card) {
-        card.style.transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
-
-        if (Math.abs(deltaX) > threshold) {
-          const direction = Math.sign(deltaX);
-          card.style.transform = `perspective(700px) translateZ(-12px) translateY(7px) translateX(${direction * 300}px) rotateY(${direction * 20}deg)`;
-
-          setTimeout(() => {
-            card.style.transform = `perspective(700px) translateZ(-12px) translateY(7px) translateX(${direction * 300}px) rotateY(${-direction * 20}deg)`;
-          }, duration / 2);
-
-          setTimeout(() => {
-            cardsRef.current = [...cardsRef.current.slice(1), card];
-            updatePositions();
-            // notify parent that top card was swiped away
-            onCardClickRef.current?.(0);
-          }, duration);
-        } else {
-          applySwipeStyles(0);
-        }
-      }
-
-      isSwiping = false;
-      startX = currentX = 0;
-    };
-
-    const onPointerDown = (e: PointerEvent) => handleStart(e.clientX);
-    const onPointerMove = (e: PointerEvent) => handleMove(e.clientX);
-    const onPointerUp = () => handleEnd();
-
-    cardStack.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    // touch events for mobile fallback
-    cardStack.addEventListener("touchstart", (e) => handleStart(e.touches[0].clientX), { passive: true } as any);
-    window.addEventListener("touchmove", (e: TouchEvent) => handleMove(e.touches[0].clientX) as any, { passive: true } as any);
-    window.addEventListener("touchend", onPointerUp);
-
-    updatePositions();
-
-    return () => {
-      cardStack.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [cards.length]);
+/** A state-driven, card-back-first adaptation of Lightswind's card stack. */
+export default function SlidingCards({ cards, activeIndex, revealedIndex, className, onReveal, onAdvance }: SlidingCardsProps) {
+  const reduceMotion = useReducedMotion();
+  const [revealedCardId, setRevealedCardId] = useState<string | number | null>(null);
+  const deck = cards.slice(activeIndex);
 
   return (
-    <section
-      ref={cardStackRef}
-      className={cn(
-        "relative w-64 h-[22rem] grid place-content-center touch-none select-none",
-        className
-      )}
-    >
-      {cards.map(({ id, icon, bgClass = "bg-gradient-to-br from-pink-300 to-orange-200", imageUrl, name, number, isHit }, index) => (
-        <article
-          key={id}
-          onClick={() => onCardClick?.(index)}
-          className={cn(
-            "card absolute inset-4 grid place-content-center rounded-xl border border-gray-400/20 shadow-xl cursor-grab transition-transform ease-in-out overflow-hidden",
-            // if we have a pokemon image, remove bg gradient and make it card-like
-            imageUrl ? "bg-vitrine-2 border-seam p-0" : bgClass
-          )}
-        >
-          {imageUrl ? (
-            <div className="w-full h-full relative group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageUrl}
-                alt={name ?? ""}
-                className="w-full h-full object-cover rounded-xl"
-                draggable={false}
-              />
-              {/* subtle hit glow */}
-              {isHit && (
-                <div className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-brass/60 shadow-[0_0_20px_rgba(211,160,60,0.5)]" />
-              )}
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                <p className="text-white text-xs font-semibold truncate">{name}{number ? ` #${number}` : ""}</p>
-              </div>
-            </div>
-          ) : (
-            <span className={cn("aspect-square grid place-content-center", cardSize)}>
-              {icon || (
-                <svg
-                  className="w-full h-full fill-white drop-shadow-md"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 16 16"
-                >
-                  <circle cx="8" cy="8" r="6" />
-                </svg>
-              )}
-            </span>
-          )}
-        </article>
-      ))}
+    <section className={cn("relative h-[22rem] w-64 select-none sm:h-[28rem] sm:w-80", className)} aria-label="Card reveal stack">
+      {deck.map((card, stackIndex) => {
+        const isTop = stackIndex === 0;
+        const isRevealed = revealedCardId === card.id || revealedIndex === activeIndex;
+        const pose = STACK_OFFSETS[Math.min(stackIndex, STACK_OFFSETS.length - 1)];
+
+        return (
+          <motion.button
+            key={card.id}
+            type="button"
+            layout
+            drag={isTop && !reduceMotion ? "x" : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.82}
+            dragSnapToOrigin
+            onDragStart={() => {
+              if (!isRevealed) {
+                setRevealedCardId(card.id);
+                onReveal();
+              }
+            }}
+            onDragEnd={(_, info) => {
+              if (isRevealed && (Math.abs(info.offset.x) > 96 || Math.abs(info.velocity.x) > 760)) {
+                onAdvance();
+              }
+            }}
+            onClick={() => {
+              if (isRevealed) onAdvance();
+              else {
+                setRevealedCardId(card.id);
+                onReveal();
+              }
+            }}
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 150, scale: 0.92, rotate: pose.rotate }}
+            animate={{
+              opacity: 1 - Math.min(stackIndex, 4) * 0.08,
+              x: pose.x,
+              y: pose.y,
+              rotate: pose.rotate,
+              scale: 1 - Math.min(stackIndex, 4) * 0.018,
+              zIndex: 100 - stackIndex,
+            }}
+            transition={{ type: "spring", stiffness: 340, damping: 27, mass: 0.8 }}
+            whileHover={isTop && !reduceMotion ? { y: pose.y - 6 } : undefined}
+            className={cn(
+              "absolute inset-0 block rounded-[16px] text-left [perspective:1200px]",
+              isTop ? "cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-brass" : "pointer-events-none",
+            )}
+            aria-label={isTop ? (isRevealed ? `Move ${card.name ?? "card"} aside` : "Turn over the next card") : undefined}
+          >
+            <motion.span
+              className="relative block h-full w-full rounded-[16px] [transform-style:preserve-3d]"
+              animate={{ rotateY: isRevealed ? 0 : 180 }}
+              transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            >
+              <span className="absolute inset-0 block overflow-hidden rounded-[16px] bg-[#071321] shadow-[0_20px_42px_rgba(0,0,0,0.48)] [backface-visibility:hidden]">
+                {card.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={card.imageUrl} alt={card.name ?? "Pokémon card"} className="h-full w-full object-cover" draggable={false} />
+                ) : (
+                  <span className="grid h-full place-content-center text-manila-3">No card image</span>
+                )}
+                {card.isHit && <span className="pointer-events-none absolute inset-0 rounded-[16px] ring-2 ring-brass/80 shadow-[inset_0_0_32px_rgba(211,160,60,0.45)]" />}
+              </span>
+              <span className="absolute inset-0 block overflow-hidden rounded-[16px] bg-[#071321] shadow-[0_20px_42px_rgba(0,0,0,0.48)] [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/card-back.jpg" alt="Face-down Pokémon card" className="h-full w-full object-cover" draggable={false} />
+                <span className="pointer-events-none absolute inset-0 rounded-[16px] ring-1 ring-white/20" />
+              </span>
+            </motion.span>
+          </motion.button>
+        );
+      })}
     </section>
   );
-};
-
-export default SlidingCards;
+}

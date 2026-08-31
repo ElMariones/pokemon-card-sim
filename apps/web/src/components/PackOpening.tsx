@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { gsap } from "gsap";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardTile } from "./CardTile";
 import { RaritySymbol } from "./RaritySymbol";
 import SlidingCards from "./lightswind/sliding-cards";
-import { REVEAL_PROFILE, CONFIDENCE_LABEL, type Cents, type RarityTier, type Confidence } from "@pcs/shared";
+import { GlassSurface } from "./GlassSurface";
+import { CONFIDENCE_LABEL, type Cents, type RarityTier, type Confidence } from "@pcs/shared";
 
 export interface OpenedCardView {
   cardId: string;
@@ -39,27 +41,9 @@ export interface OpeningView {
   cards: OpenedCardView[];
 }
 
-const DWELL_MS: Record<(typeof REVEAL_PROFILE)[RarityTier], number> = {
-  quick: 850,
-  standard: 1300,
-  shine: 1900,
-  spectacle: 2800,
-};
-
-const EXIT_S = 0.16;
-const ENTER_S = { quick: 0.3, standard: 0.34, shine: 0.45, spectacle: 0.7 } as const;
-
 type Phase = "sealed" | "tearing" | "revealing" | "summary";
 
-export function PackOpening({
-  opening,
-  onDone,
-  onBack,
-  onOpenAgain,
-  canOpenAgain = true,
-  busy = false,
-  onSell,
-}: {
+type PackOpeningProps = {
   opening: OpeningView;
   onDone?: () => void;
   onBack?: () => void;
@@ -67,37 +51,54 @@ export function PackOpening({
   canOpenAgain?: boolean;
   busy?: boolean;
   onSell?: (inventoryId: string) => void;
-}) {
+};
+
+export function PackOpening(props: PackOpeningProps) {
+  // A new opening is a new interaction session. Remounting avoids resetting
+  // state from an effect, which briefly showed stale cards for a new pack.
+  return <PackOpeningSession key={props.opening.openingId} {...props} />;
+}
+
+function PackOpeningSession({
+  opening,
+  onDone,
+  onBack,
+  onOpenAgain,
+  canOpenAgain = true,
+  busy = false,
+  onSell,
+}: PackOpeningProps) {
   const handleBack = onBack ?? onDone ?? (() => {});
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>("sealed");
   const [index, setIndex] = useState(-1);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [faceUpIndex, setFaceUpIndex] = useState(-1);
   const liveRef = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    setPhase("sealed");
-    setIndex(-1);
-    clearTimer();
-  }, [opening.openingId]);
 
   const cards = opening.cards;
   const current = index >= 0 ? cards[index] : undefined;
 
-  const clearTimer = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-
   const skip = useCallback(() => {
-    clearTimer();
     setIndex(cards.length);
+    setPhase("summary");
   }, [cards.length]);
 
   const advance = useCallback(() => {
-    clearTimer();
-    setIndex((i) => Math.min(i + 1, cards.length));
-  }, [cards.length]);
+    if (index >= cards.length - 1) {
+      setIndex(cards.length);
+      setPhase("summary");
+      return;
+    }
+    setIndex((i) => i + 1);
+  }, [cards.length, index]);
+
+  const revealOrAdvance = useCallback(() => {
+    if (faceUpIndex !== index) {
+      setFaceUpIndex(index);
+      return;
+    }
+    advance();
+  }, [advance, faceUpIndex, index]);
 
   const startTear = useCallback(() => {
     if (phase !== "sealed") return;
@@ -107,27 +108,16 @@ export function PackOpening({
       return;
     }
     setPhase("tearing");
-    // flap tears, then cards begin to slide out
-    setTimeout(() => {
-      setPhase("revealing");
-      setIndex(0);
-    }, 620);
   }, [phase, reduceMotion]);
 
   useEffect(() => {
-    if (index >= cards.length && phase === "revealing") setPhase("summary");
-  }, [index, cards.length, phase]);
-
-  // Sliding Cards is user-driven (swipe/click); auto dwell is disabled to keep
-  // the 3D stack and the progress dots in sync. User can still press Space/Next
-  // or swipe; Skip jumps to summary. If you want timed auto-reveal, re-enable:
-  // const dwell = reduceMotion ? 260 : DWELL_MS[REVEAL_PROFILE[card.rarityTier]];
-  // timer.current = setTimeout(advance, dwell);
-  useEffect(() => {
-    if (phase !== "revealing" || index < 0 || index >= cards.length) return;
-    // keep timer cleared — manual swipe/click drives advance
-    return clearTimer;
-  }, [phase, index, cards]);
+    if (phase !== "tearing") return;
+    const timeout = window.setTimeout(() => {
+      setPhase("revealing");
+      setIndex(0);
+    }, 620);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
 
   useEffect(() => {
     if (!current || !liveRef.current) return;
@@ -144,12 +134,12 @@ export function PackOpening({
         e.preventDefault();
         if (phase === "sealed") startTear();
         else if (phase === "tearing") { /* wait for animation */ }
-        else if (phase === "revealing") advance();
+        else if (phase === "revealing") revealOrAdvance();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, advance, skip, startTear]);
+  }, [phase, revealOrAdvance, skip, startTear]);
 
   const profit = opening.totalValue - opening.cost;
 
@@ -262,30 +252,28 @@ export function PackOpening({
           {/* Lightswind Sliding Cards — interactive 3D stack */}
           <div className="relative">
             <SlidingCards
-              key={opening.openingId}
               cards={slidingData}
+              activeIndex={index}
+              revealedIndex={faceUpIndex}
               className="w-[300px] h-[420px] sm:w-[340px] sm:h-[480px]"
-              cardSize="w-full h-full"
-              onCardClick={() => {
-                // swipe away top card counts as seeing it
-                const next = Math.min(index + 1, cards.length);
-                setIndex(next);
-                if (next >= cards.length) setPhase("summary");
-              }}
+              onReveal={() => setFaceUpIndex(index)}
+              onAdvance={advance}
             />
             {/* current card meta overlay */}
-            {current && (
+            {current && faceUpIndex === index && (
               <motion.div
                 key={current.inventoryId + "-meta"}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="pointer-events-none absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink/80 px-3 py-1.5 ring-1 ring-seam backdrop-blur"
+                className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2"
               >
-                <RaritySymbol tier={current.rarityTier} className="h-3 w-3" />
-                <span className="text-xs font-medium text-white">{current.name}</span>
-                <span className="text-manila-3 text-[11px]">#{current.number}</span>
-                <span className="t-num text-brass ml-1 text-xs tabular-nums">{money(current.value)}</span>
-                {current.isHit && <span className="bg-brass text-ink ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase">Hit</span>}
+                <GlassSurface className="flex min-w-max items-center gap-2 rounded-full px-3 py-2">
+                  <RaritySymbol tier={current.rarityTier} className="h-3 w-3 text-brass" />
+                  <span className="text-xs font-semibold text-white">{current.name}</span>
+                  <span className="text-manila-2 text-[11px]">#{current.number}</span>
+                  <span className="t-num ml-1 text-xs tabular-nums text-brass-hot">{money(current.value)}</span>
+                  {current.isHit && <span className="bg-brass text-ink rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase">Hit</span>}
+                </GlassSurface>
               </motion.div>
             )}
           </div>
@@ -304,19 +292,19 @@ export function PackOpening({
           <p className="text-manila-3 text-center text-xs">
             {index >= 0 ? `${Math.min(index + 1, cards.length)} of ${cards.length}` : `Swipe or drag the stack • ${cards.length} cards`}
             <br />
-            <span className="opacity-70">Tap / swipe top card to slide • Space to advance</span>
+            <span className="opacity-70">Tap or drag to turn it over • move a face-up card aside</span>
           </p>
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={advance}
+              onClick={revealOrAdvance}
               className="ring-seam text-manila hover:ring-brass rounded-pane px-4 py-2 text-xs ring-1 transition"
             >
               Next
             </button>
             <button
               type="button"
-              onClick={() => setIndex(cards.length)}
+              onClick={skip}
               className="bg-brass text-ink hover:bg-brass-hot rounded-pane px-5 py-2 text-xs font-semibold transition"
             >
               View results
@@ -472,6 +460,12 @@ function BoosterPack({
       type="button"
       onClick={onRip}
       disabled={phase !== "sealed"}
+      initial={phase === "tearing" ? { scale: 1, y: 0, rotate: 0 } : false}
+      animate={
+        phase === "tearing"
+          ? { scale: [1, 1.025, 0.98], y: [0, 4, 18], rotate: [0, -1.4, 1.8] }
+          : { scale: 1, y: 0, rotate: 0 }
+      }
       whileHover={phase === "sealed" && !reduceMotion ? { y: -6, rotate: -0.6 } : undefined}
       whileTap={phase === "sealed" && !reduceMotion ? { scale: 0.98 } : undefined}
       transition={{ type: "spring", stiffness: 420, damping: 22 }}
@@ -537,6 +531,7 @@ function BoosterPack({
       {/* crimp — the serrated seal */}
       <motion.div
         className="absolute inset-x-0 top-0 h-[13%] overflow-hidden bg-[#0a0e1a]"
+        initial={phase === "tearing" ? { y: 0, rotate: 0, x: 0, opacity: 1 } : false}
         style={{
           clipPath:
             "polygon(0 0,100% 0,100% 58%,97% 42%,93% 62%,88% 38%,83% 60%,78% 34%,73% 58%,68% 30%,63% 55%,58% 28%,52% 52%,47% 26%,42% 50%,37% 22%,32% 48%,27% 20%,22% 45%,17% 18%,12% 42%,7% 16%,3% 36%,0 30%)",
@@ -573,6 +568,10 @@ function BoosterPack({
         )}
       </motion.div>
 
+      {phase === "tearing" && (
+        <PackPeelFlap />
+      )}
+
       {/* slit highlight when torn */}
       {phase !== "sealed" && (
         <motion.div
@@ -589,63 +588,32 @@ function BoosterPack({
   );
 }
 
-function RevealCard({
-  card,
-  reduceMotion,
-  onAdvance,
-}: {
-  card: OpenedCardView;
-  reduceMotion: boolean;
-  onAdvance: () => void;
-}) {
-  const d = rarityDisplay(card.rarityTier);
-  const profile = REVEAL_PROFILE[card.rarityTier];
-  const big = profile === "spectacle" || profile === "shine";
+/**
+ * The pack-specific form of React Bits' StickerPeel flap: it starts as part of
+ * the wrapper, then lifts and folds away from the jagged tear line.
+ */
+function PackPeelFlap() {
+  const flapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!flapRef.current) return;
+    const animation = gsap.fromTo(
+      flapRef.current,
+      { y: 0, rotationX: 0, rotationZ: 0, opacity: 1, transformOrigin: "50% 0%" },
+      { y: -92, rotationX: -72, rotationZ: -4, opacity: 0, duration: 0.58, ease: "power3.out" },
+    );
+    return () => {
+      animation.kill();
+    };
+  }, []);
 
   return (
-    <motion.button
-      type="button"
-      onClick={onAdvance}
-      initial={reduceMotion ? { opacity: 0, y: 12 } : { opacity: 0, y: 28, rotateY: -18, scale: 0.92 }}
-      animate={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0, rotateY: 0, scale: big ? 1.04 : 1 }}
-      exit={
-        reduceMotion
-          ? { opacity: 0, transition: { duration: 0 } }
-          : { opacity: 0, y: -18, scale: 0.97, transition: { duration: EXIT_S } }
-      }
-      transition={{
-        duration: reduceMotion ? 0.1 : ENTER_S[profile],
-        ease: [0.16, 1, 0.3, 1],
-      }}
-      className={cn(
-        "relative rounded-card focus-visible:outline-2 focus-visible:outline-brass",
-        profile === "spectacle" && !reduceMotion && "animate-impact",
-      )}
-      aria-label={`${card.name}, ${d.label}. Click to continue.`}
+    <div
+      ref={flapRef}
+      className="wrapper-mylar pointer-events-none absolute inset-x-0 top-[12%] h-[24%] [transform-style:preserve-3d]"
+      style={{ clipPath: "polygon(0 0,100% 0,100% 54%,88% 68%,74% 48%,58% 73%,43% 50%,28% 71%,14% 46%,0 64%)" }}
     >
-      <div className="w-52 sm:w-64">
-        <CardTile
-          name={card.name}
-          number={card.number}
-          rarityTier={card.rarityTier}
-          imageUrl={card.imageLarge ?? card.imageSmall}
-          value={card.value}
-          isReverse={card.isReverse}
-          priority
-        />
-      </div>
-
-      {card.isHit && (
-        <span
-          className={cn(
-            "bg-brass text-ink absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1",
-            "text-[10px] font-bold tracking-[0.18em] uppercase",
-          )}
-        >
-          <RaritySymbol tier={card.rarityTier} className="mr-1 -mt-0.5 inline h-3 w-3" title={false} />
-          {d.label}
-        </span>
-      )}
-    </motion.button>
+      <div className="absolute inset-x-2 top-[50%] h-5 origin-left bg-gradient-to-r from-transparent via-white/85 to-transparent mix-blend-overlay" />
+    </div>
   );
 }
