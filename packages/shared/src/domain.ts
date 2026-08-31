@@ -1,6 +1,6 @@
-import type { Cents } from './money.js';
-import type { Confidence } from './confidence.js';
-import type { RarityTier } from './rarity.js';
+import type { Cents } from './money';
+import type { Confidence } from './confidence';
+import type { RarityTier } from './rarity';
 
 // ---------------------------------------------------------------------------
 // Real-world data layer (design doc section 2). Nothing here knows about a

@@ -6,8 +6,8 @@
  * pack-pulled card gets one.
  */
 import { CONDITIONS, type Condition } from '@pcs/shared';
-import { bp, type Bp } from './basis-points.js';
-import { weightedPick, type Rng } from './rng.js';
+import { bp, type Bp } from './basis-points';
+import { weightedPick, type Rng } from './rng';
 
 /**
  * Price multipliers, in basis points.

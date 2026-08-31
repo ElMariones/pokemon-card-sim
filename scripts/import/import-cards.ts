@@ -13,10 +13,10 @@
  *   npx tsx scripts/import/import-cards.ts --missing     # only empty sets
  */
 import { sql, eq } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index.js';
-import { sets, cards } from '../../packages/db/src/schema.js';
-import { normalizeRarity } from '../../packages/shared/src/index.js';
-import { fetchJson, NotFoundError, chunk, parseArgs, runScript } from './http.js';
+import { getDb } from '../../packages/db/src/index';
+import { sets, cards } from '../../packages/db/src/schema';
+import { normalizeRarity } from '../../packages/shared/src/index';
+import { fetchJson, NotFoundError, chunk, parseArgs, runScript } from './http';
 
 const CARDS_URL = (setId: string) =>
   `https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/cards/en/${setId}.json`;

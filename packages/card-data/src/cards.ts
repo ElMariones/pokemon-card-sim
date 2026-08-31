@@ -1,13 +1,13 @@
 import { and, eq, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
-import { cards, sets } from '../../db/src/schema.js';
+import { cards, sets } from '../../db/src/schema';
 import {
   RARITY_RANK,
   type Cents,
   type Confidence,
   type Era,
   type RarityTier,
-} from '../../shared/src/index.js';
-import { resolveDb, toCount, type CardDataDb } from './client.js';
+} from '../../shared/src/index';
+import { resolveDb, toCount, type CardDataDb } from './client';
 import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
@@ -15,7 +15,7 @@ import {
   type CardWithSet,
   type ListCardsFilter,
   type Page,
-} from './types.js';
+} from './types';
 
 const CARD_COLUMNS = {
   id: cards.id,

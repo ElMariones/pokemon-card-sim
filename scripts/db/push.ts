@@ -4,7 +4,7 @@
  * PGlite and Neon need different migrator entry points, so this dispatches on
  * DATABASE_URL the same way getDb() does.
  */
-import { isPgliteMode } from '../../packages/db/src/index.js';
+import { isPgliteMode, resolveDataDir } from '../../packages/db/src/index';
 
 const MIGRATIONS = './packages/db/migrations';
 
@@ -14,7 +14,7 @@ async function main() {
     const { drizzle } = await import('drizzle-orm/pglite');
     const { migrate } = await import('drizzle-orm/pglite/migrator');
 
-    const dir = process.env.PGLITE_DATA_DIR ?? './data/pgdata';
+    const dir = resolveDataDir();
     const db = drizzle(new PGlite(dir));
     await migrate(db, { migrationsFolder: MIGRATIONS });
     console.log(`Migrations applied to PGlite at ${dir}`);

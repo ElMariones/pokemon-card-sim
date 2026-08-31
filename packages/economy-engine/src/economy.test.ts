@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { cents, CONDITIONS, type Cents } from '../../shared/src/index.js';
-import { dealerBuyOffer, dealerAskPrice, computePrice, derivePackPrice, PRICE_FLOOR } from './pricing.js';
-import { conditionMultiplier, conditionRank, rollPackCondition } from './condition.js';
-import { rollGrade, gradedValue, SERVICE_TIERS, GRADE_LABEL } from './grading.js';
-import { mulberry32 } from './rng.js';
-import { applyBp, splitCents, bp, BP_ONE } from './basis-points.js';
+import { cents, CONDITIONS, type Cents } from '../../shared/src/index';
+import { dealerBuyOffer, dealerAskPrice, computePrice, derivePackPrice, PRICE_FLOOR } from './pricing';
+import { conditionMultiplier, conditionRank, rollPackCondition } from './condition';
+import { rollGrade, gradedValue, SERVICE_TIERS, GRADE_LABEL } from './grading';
+import { mulberry32 } from './rng';
+import { applyBp, splitCents, bp, BP_ONE } from './basis-points';
 
 const rng = mulberry32(12345);
 

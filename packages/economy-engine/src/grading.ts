@@ -1,7 +1,7 @@
-import { cents, type Cents, type Condition } from '../../shared/src/index.js';
-import { applyBp, bp, type Bp } from './basis-points.js';
-import { conditionRank } from './condition.js';
-import { weightedPick, type Rng } from './rng.js';
+import { cents, type Cents, type Condition } from '../../shared/src/index';
+import { applyBp, bp, type Bp } from './basis-points';
+import { conditionRank } from './condition';
+import { weightedPick, type Rng } from './rng';
 
 /**
  * Card grading (DESIGN.md section 11).

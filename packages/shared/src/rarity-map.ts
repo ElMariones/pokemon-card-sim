@@ -1,4 +1,4 @@
-import type { RarityTier } from './rarity.js';
+import type { RarityTier } from './rarity';
 
 /**
  * Exhaustive map of every rarity string pokemontcg.io currently publishes

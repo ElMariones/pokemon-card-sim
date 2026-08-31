@@ -1,9 +1,11 @@
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
-import * as schema from './schema.js';
+import path from 'node:path';
+import fs from 'node:fs';
+import * as schema from './schema';
 
-export * as schema from './schema.js';
-export * from './schema.js';
+export * as schema from './schema';
+export * from './schema';
 
 /**
  * One database, two drivers.
@@ -50,10 +52,44 @@ export async function getDb(): Promise<Database> {
   }
 
   const { PGlite } = await import('@electric-sql/pglite');
-  const dataDir = process.env.PGLITE_DATA_DIR ?? './data/pgdata';
-  const db = drizzlePglite(new PGlite(dataDir), { schema });
+  const db = drizzlePglite(new PGlite(resolveDataDir()), { schema });
   globalRef[CACHE_KEY] = db;
   return db;
+}
+
+/**
+ * Absolute path to the PGlite data directory.
+ *
+ * It cannot be relative to the working directory: scripts run from the repo
+ * root, but Next.js runs with cwd = apps/web, so './data/pgdata' pointed at two
+ * different places and the dev server silently tried to create its own empty
+ * database. Anchor to the workspace root instead, found by walking up for the
+ * package.json that declares workspaces.
+ */
+export function resolveDataDir(): string {
+  const override = process.env.PGLITE_DATA_DIR;
+  if (override) return path.resolve(override);
+  return path.join(findWorkspaceRoot(), 'data', 'pgdata');
+}
+
+function findWorkspaceRoot(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 8; i++) {
+    const manifest = path.join(dir, 'package.json');
+    if (fs.existsSync(manifest)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8')) as { workspaces?: unknown };
+        if (pkg.workspaces) return dir;
+      } catch {
+        // Unreadable manifest: keep walking rather than guessing.
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // No workspace root found (a standalone deploy). Fall back to cwd.
+  return process.cwd();
 }
 
 /** Test helper: an ephemeral in-memory database with no persistence. */

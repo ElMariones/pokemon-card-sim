@@ -13,10 +13,10 @@
  *   npx tsx scripts/import/import-prices.ts --missing --limit=30
  */
 import { sql, eq, inArray } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index.js';
-import { sets, cards, marketState } from '../../packages/db/src/schema.js';
-import { selectBasePrice, type PriceSourceCard } from '../../packages/card-data/src/price-selection.js';
-import { fetchJson, chunk, parseArgs, sleep, runScript } from './http.js';
+import { getDb } from '../../packages/db/src/index';
+import { sets, cards, marketState } from '../../packages/db/src/schema';
+import { selectBasePrice, type PriceSourceCard } from '../../packages/card-data/src/price-selection';
+import { fetchJson, chunk, parseArgs, sleep, runScript } from './http';
 
 const PAGE_SIZE = 250;
 const DELAY_MS = Number(process.env.PRICE_DELAY_MS ?? 700);

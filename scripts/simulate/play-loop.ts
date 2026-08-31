@@ -8,12 +8,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index.js';
-import { users } from '../../packages/db/src/schema.js';
-import { formatCents, cents } from '../../packages/shared/src/index.js';
-import { applyTransaction, auditBalance } from '../../packages/economy-engine/src/ledger.js';
-import { buyAndOpenPack, sellCard, getPackPrice } from '../../apps/web/src/server/game.js';
-import { parseArgs, runScript } from '../import/http.js';
+import { getDb } from '../../packages/db/src/index';
+import { users } from '../../packages/db/src/schema';
+import { formatCents, cents } from '../../packages/shared/src/index';
+import { applyTransaction, auditBalance } from '../../packages/economy-engine/src/ledger';
+import { buyAndOpenPack, sellCard, getPackPrice } from '../../apps/web/src/server/game';
+import { parseArgs, runScript } from '../import/http';
 
 async function main() {
   const args = parseArgs();

@@ -1,7 +1,7 @@
-import { cents, scaleCents, type Cents } from '../../shared/src/index.js';
-import type { Condition, RarityTier } from '../../shared/src/index.js';
-import { BP_ONE, applyBp, clampBp, composeBp, bp, type Bp } from './basis-points.js';
-import { conditionMultiplier } from './condition.js';
+import { cents, scaleCents, type Cents } from '../../shared/src/index';
+import type { Condition, RarityTier } from '../../shared/src/index';
+import { BP_ONE, applyBp, clampBp, composeBp, bp, type Bp } from './basis-points';
+import { conditionMultiplier } from './condition';
 
 /**
  * The card market (DESIGN.md section 12).

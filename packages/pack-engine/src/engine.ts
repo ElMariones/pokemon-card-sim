@@ -1,8 +1,8 @@
-import { isHit as rarityIsHit, type RarityTier } from '../../shared/src/index.js';
-import { makeRng, hashSeed, weightedPick, type Rng } from './rng.js';
+import { isHit as rarityIsHit, type RarityTier } from '../../shared/src/index';
+import { makeRng, hashSeed, weightedPick, type Rng } from './rng';
 import type {
   EngineCard, EnginePackTemplate, EnginePullTable, OpeningResult, PulledCard,
-} from './types.js';
+} from './types';
 
 /**
  * The pack simulator.

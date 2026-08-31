@@ -1,4 +1,4 @@
-import type { Confidence, RarityTier } from '../../shared/src/index.js';
+import type { Confidence, RarityTier } from '../../shared/src/index';
 
 /** A card as the engine sees it. Deliberately minimal: no prices, no images. */
 export interface EngineCard {

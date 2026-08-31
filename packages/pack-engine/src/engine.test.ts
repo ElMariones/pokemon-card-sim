@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { openPack, PackEngineError } from './engine.js';
-import { deriveTemplate, isReverseEligible } from './templates.js';
-import type { EngineCard, EnginePullTable, EnginePackTemplate } from './types.js';
-import type { RarityTier } from '../../shared/src/index.js';
+import { openPack, PackEngineError } from './engine';
+import { deriveTemplate, isReverseEligible } from './templates';
+import type { EngineCard, EnginePullTable, EnginePackTemplate } from './types';
+import type { RarityTier } from '../../shared/src/index';
 
 /** A synthetic set with a realistic rarity spread. */
 function makeCards(setId: string, era: string): EngineCard[] {

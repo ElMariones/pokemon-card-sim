@@ -10,7 +10,13 @@ const nextConfig: NextConfig = {
   },
   // The workspace packages ship raw TypeScript from src/, so Next has to
   // compile them rather than treat them as prebuilt node_modules.
-  transpilePackages: ["@pcs/shared"],
+  transpilePackages: [
+    "@pcs/shared",
+    "@pcs/db",
+    "@pcs/card-data",
+    "@pcs/pack-engine",
+    "@pcs/economy-engine",
+  ],
 };
 
 export default nextConfig;

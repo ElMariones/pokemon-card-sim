@@ -10,12 +10,12 @@
  *   npm run simulate -- --all --n=2000
  */
 import { eq } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index.js';
-import { sets, cards as cardsTable } from '../../packages/db/src/schema.js';
-import { openPack, deriveTemplate, isReverseEligible, createSeed } from '../../packages/pack-engine/src/index.js';
-import type { EngineCard } from '../../packages/pack-engine/src/types.js';
-import { RARITY_TIERS, formatCents, cents, type RarityTier } from '../../packages/shared/src/index.js';
-import { parseArgs, runScript } from '../import/http.js';
+import { getDb } from '../../packages/db/src/index';
+import { sets, cards as cardsTable } from '../../packages/db/src/schema';
+import { openPack, deriveTemplate, isReverseEligible, createSeed } from '../../packages/pack-engine/src/index';
+import type { EngineCard } from '../../packages/pack-engine/src/types';
+import { RARITY_TIERS, formatCents, cents, type RarityTier } from '../../packages/shared/src/index';
+import { parseArgs, runScript } from '../import/http';
 
 const pct = (n: number, d: number) => (d === 0 ? '0.00' : ((n / d) * 100).toFixed(2));
 

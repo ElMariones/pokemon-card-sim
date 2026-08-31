@@ -4,10 +4,10 @@
  * Source: PokemonTCG/pokemon-tcg-data bulk JSON (no rate limit, no API key).
  * Idempotent: re-running updates in place rather than duplicating.
  */
-import { getDb } from '../../packages/db/src/index.js';
-import { sets } from '../../packages/db/src/schema.js';
-import { deriveEra, isKnownSeries } from '../../packages/card-data/src/era.js';
-import { fetchJson, normalizeDate, chunk, runScript } from './http.js';
+import { getDb } from '../../packages/db/src/index';
+import { sets } from '../../packages/db/src/schema';
+import { deriveEra, isKnownSeries } from '../../packages/card-data/src/era';
+import { fetchJson, normalizeDate, chunk, runScript } from './http';
 
 const SETS_URL = 'https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master/sets/en.json';
 const SOURCE = 'pokemon-tcg-data';

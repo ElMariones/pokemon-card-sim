@@ -1,5 +1,5 @@
-import type { Confidence, RarityTier } from '../../shared/src/index.js';
-import type { EngineCard, EnginePackTemplate, EnginePullTable } from './types.js';
+import type { Confidence, RarityTier } from '../../shared/src/index';
+import type { EngineCard, EnginePackTemplate, EnginePullTable } from './types';
 
 /**
  * Where pack structure comes from.

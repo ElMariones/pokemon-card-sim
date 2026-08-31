@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
-import { cents, type Cents } from '../../shared/src/index.js';
-import { users, transactions } from '../../db/src/schema.js';
+import { cents, type Cents } from '../../shared/src/index';
+import { users, transactions } from '../../db/src/schema';
 import { randomUUID } from 'node:crypto';
 
 /**

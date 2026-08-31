@@ -1,4 +1,4 @@
-import { getDb, type Database } from '../../db/src/index.js';
+import { getDb, type Database } from '../../db/src/index';
 
 /**
  * Every query in this package takes an optional database handle and falls back

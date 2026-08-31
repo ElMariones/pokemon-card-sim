@@ -1,4 +1,4 @@
-import { dollarsToCents, type Cents, type Confidence } from '../../shared/src/index.js';
+import { dollarsToCents, type Cents, type Confidence } from '../../shared/src/index';
 
 /**
  * Turning a pile of third-party price quotes into one baseline number.

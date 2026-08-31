@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
-import { cards, sets } from '../../db/src/schema.js';
-import type { Era } from '../../shared/src/index.js';
-import { resolveDb, toCount, type CardDataDb } from './client.js';
-import type { ListSetsFilter, SetRecord } from './types.js';
+import { cards, sets } from '../../db/src/schema';
+import type { Era } from '../../shared/src/index';
+import { resolveDb, toCount, type CardDataDb } from './client';
+import type { ListSetsFilter, SetRecord } from './types';
 
 const SET_COLUMNS = {
   id: sets.id,

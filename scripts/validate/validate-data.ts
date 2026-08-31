@@ -5,8 +5,8 @@
  * integrity check fails, so it can gate a deploy.
  */
 import { sql } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index.js';
-import { runScript } from '../import/http.js';
+import { getDb } from '../../packages/db/src/index';
+import { runScript } from '../import/http';
 
 async function main() {
   const db = await getDb();

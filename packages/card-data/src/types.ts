@@ -1,4 +1,4 @@
-import type { Cents, Confidence, Era, RarityTier } from '../../shared/src/index.js';
+import type { Cents, Confidence, Era, RarityTier } from '../../shared/src/index';
 
 /** A `sets` row as the app sees it, plus derived counts where requested. */
 export interface SetRecord {

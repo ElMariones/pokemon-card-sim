@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeRng, hashSeed, createSeed, weightedPick, weightedPickDistinct } from './rng.js';
+import { makeRng, hashSeed, createSeed, weightedPick, weightedPickDistinct } from './rng';
 
 describe('makeRng', () => {
   it('is deterministic for a given seed', () => {

@@ -1,4 +1,4 @@
-import { ERAS, type Era } from '../../shared/src/index.js';
+import { ERAS, type Era } from '../../shared/src/index';
 
 /**
  * Series string -> Era.
