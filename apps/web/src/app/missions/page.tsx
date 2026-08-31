@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { LevelBadge } from "@/components/LevelBadge";
+import { usePlayer } from "@/components/PlayerProvider";
 import type { Cents } from "@pcs/shared";
 
 interface Mission {
@@ -25,6 +26,7 @@ const CADENCE_LABEL: Record<string, string> = {
 };
 
 export default function MissionsPage() {
+  const { refresh, setCash: setHeaderCash } = usePlayer();
   const [prog, setProg] = useState<Progression | null>(null);
   const [cash, setCash] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,9 @@ export default function MissionsPage() {
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error ?? "Could not claim"); return; }
+    if (data.balanceAfter != null) setHeaderCash(data.balanceAfter);
     await load();
+    void refresh();
   };
 
   return (

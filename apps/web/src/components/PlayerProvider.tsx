@@ -67,6 +67,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Keep header cash fresh even if a page forgot to call refresh().
+  // Polling and focus refresh are cheap and paper over missed calls.
+  useEffect(() => {
+    const onFocus = () => { void refresh(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    // Custom event any mutating component can dispatch as a safety net
+    const onCustom = () => { void refresh(); };
+    window.addEventListener("pcs:refresh" as never, onCustom as never);
+    const id = setInterval(() => { void refresh(); }, 15000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pcs:refresh" as never, onCustom as never);
+      clearInterval(id);
+    };
+  }, [refresh]);
+
   const setCash = useCallback((cash: Cents) => {
     setPlayer((p) => (p ? { ...p, cash } : p));
   }, []);

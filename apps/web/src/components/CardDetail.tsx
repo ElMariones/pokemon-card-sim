@@ -8,6 +8,7 @@ import { CardFace } from "./CardFace";
 import { GradedSlab } from "./GradedSlab";
 import { RaritySymbol } from "./RaritySymbol";
 import { PriceChart } from "./PriceChart";
+import { usePlayer } from "./PlayerProvider";
 import { CONFIDENCE_LABEL, type Cents, type Confidence, type RarityTier } from "@pcs/shared";
 
 interface Copy {
@@ -54,6 +55,7 @@ export function CardDetail({
   onClose: () => void;
   onChanged?: () => void;
 }) {
+  const { refresh, setCash } = usePlayer();
   const [data, setData] = useState<Detail | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,8 +93,11 @@ export function CardDetail({
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "Something went wrong"); return; }
+      if (json.balanceAfter != null) setCash(json.balanceAfter);
+      else if (json.offer != null || json.netProceeds != null) void refresh();
       await load();
       onChanged?.();
+      void refresh();
     } finally { setBusy(false); }
   };
 

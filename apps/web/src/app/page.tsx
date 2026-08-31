@@ -52,10 +52,23 @@ export default function PacksPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not open pack"); return; }
+      // Ensure setId survives even if server shape changes
+      if (!data.setId) data.setId = setId;
       setOpening(data);
       setCash(data.balanceAfter);
     } finally { setBusy(false); }
   };
+
+  const handleOpenAgain = useCallback(() => {
+    const sid = opening?.setId;
+    if (!sid) { setError("Could not determine pack to reopen"); return; }
+    void openPack(sid);
+  }, [opening?.setId]);
+
+  const handleBack = useCallback(() => {
+    setOpening(null);
+    void refresh();
+  }, [refresh]);
 
   const sell = async (inventoryId: string) => {
     const res = await fetch("/api/sell", {
@@ -84,7 +97,11 @@ export default function PacksPage() {
       {opening ? (
         <PackOpening
           opening={opening}
-          onDone={() => { setOpening(null); void refresh(); }}
+          onBack={handleBack}
+          onOpenAgain={opening.setId ? handleOpenAgain : undefined}
+          canOpenAgain={player ? player.cash >= opening.cost : false}
+          busy={busy}
+          onDone={handleBack}
           onSell={sell}
         />
       ) : (

@@ -26,6 +26,7 @@ export interface OpenedCardView {
 
 export interface OpeningView {
   openingId: string;
+  setId?: string;
   setName: string;
   cost: Cents;
   totalValue: Cents;
@@ -63,17 +64,33 @@ type Phase = "sealed" | "revealing" | "summary";
 export function PackOpening({
   opening,
   onDone,
+  onBack,
+  onOpenAgain,
+  canOpenAgain = true,
+  busy = false,
   onSell,
 }: {
   opening: OpeningView;
-  onDone: () => void;
+  onDone?: () => void;
+  onBack?: () => void;
+  onOpenAgain?: () => void;
+  canOpenAgain?: boolean;
+  busy?: boolean;
   onSell?: (inventoryId: string) => void;
 }) {
+  const handleBack = onBack ?? onDone ?? (() => {});
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>("sealed");
   const [index, setIndex] = useState(-1);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveRef = useRef<HTMLParagraphElement>(null);
+
+  // Reset to sealed when a new pack is opened again (new openingId)
+  useEffect(() => {
+    setPhase("sealed");
+    setIndex(-1);
+    clearTimer();
+  }, [opening.openingId]);
 
   const cards = opening.cards;
   const current = index >= 0 ? cards[index] : undefined;
@@ -222,6 +239,40 @@ export function PackOpening({
             transition={{ duration: reduceMotion ? 0 : 0.3 }}
             className="w-full"
           >
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="ring-seam text-manila hover:ring-brass rounded-pane px-4 py-2 text-sm ring-1 transition"
+              >
+                ← Back
+              </button>
+              {onOpenAgain ? (
+                <button
+                  type="button"
+                  onClick={onOpenAgain}
+                  disabled={!canOpenAgain || busy}
+                  title={!canOpenAgain ? "Not enough cash" : undefined}
+                  className={cn(
+                    "rounded-pane px-5 py-2.5 text-sm font-semibold transition",
+                    canOpenAgain && !busy
+                      ? "bg-brass text-ink hover:bg-brass-hot"
+                      : "bg-vitrine-3 text-manila-3 cursor-not-allowed ring-seam ring-1",
+                  )}
+                >
+                  {busy ? "Opening…" : `Open again · ${money(opening.cost)}`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="bg-brass text-ink hover:bg-brass-hot rounded-pane px-5 py-2.5 text-sm font-semibold transition"
+                >
+                  Back to packs
+                </button>
+              )}
+            </div>
+
             <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="t-eyebrow text-manila-3">{opening.setName}</p>
@@ -278,18 +329,11 @@ export function PackOpening({
               ))}
             </ul>
 
-            <footer className="border-seam mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-5">
+            <footer className="border-seam mt-8 border-t pt-5">
               <p className="text-manila-3 max-w-lg text-[11px] leading-relaxed">
                 {CONFIDENCE_LABEL[opening.confidence]} for this set.{" "}
                 <span className="t-mono">seed {opening.seedHash.slice(0, 12)}…</span>
               </p>
-              <button
-                type="button"
-                onClick={onDone}
-                className="bg-brass text-ink hover:bg-brass-hot rounded-pane px-5 py-2.5 text-sm font-semibold transition"
-              >
-                Open another
-              </button>
             </footer>
           </motion.div>
       )}

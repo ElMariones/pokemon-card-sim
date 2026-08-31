@@ -84,8 +84,9 @@ export async function submitForGrading(
   }
 
   // Charge the fee first; if the player cannot afford it nothing else happens.
+  let balanceAfter: Cents;
   try {
-    await applyTransaction(db as never, {
+    const txRes = await applyTransaction(db as never, {
       userId,
       type: 'grading_fee',
       amount: cents(-tier.fee),
@@ -93,6 +94,7 @@ export async function submitForGrading(
       itemId: inventoryId,
       metadata: { tier: tier.id, company: tier.company },
     });
+    balanceAfter = txRes.balanceAfter;
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
       throw new GameError('Not enough cash for that grading tier', 'insufficient_funds');
@@ -140,6 +142,7 @@ export async function submitForGrading(
     fee: tier.fee,
     readyAt: readyAt.toISOString(),
     secondsRemaining: Math.ceil((readyAt.getTime() - Date.now()) / 1000),
+    balanceAfter: balanceAfter!,
   };
 }
 

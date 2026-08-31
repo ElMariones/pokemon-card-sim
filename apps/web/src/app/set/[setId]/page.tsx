@@ -9,6 +9,7 @@ import { CompletionBar } from "@/components/CompletionBar";
 import { RaritySymbol } from "@/components/RaritySymbol";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardDetail } from "@/components/CardDetail";
+import { usePlayer } from "@/components/PlayerProvider";
 import type { Cents, RarityTier } from "@pcs/shared";
 
 interface BinderCard {
@@ -27,6 +28,7 @@ type Filter = "all" | "owned" | "missing";
 
 export default function SetPage({ params }: { params: Promise<{ setId: string }> }) {
   const { setId } = use(params);
+  const { player, setCash, refresh } = usePlayer();
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [binder, setBinder] = useState<BinderCard[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -35,6 +37,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [packError, setPackError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,6 +62,27 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
           c.number.toLowerCase().includes(search.toLowerCase()),
       )
     : binder;
+
+  const affordable = packPrice !== null && player !== null ? player.cash >= packPrice : true;
+
+  const handleOpenPack = async () => {
+    setOpening(true);
+    setPackError(null);
+    try {
+      const res = await fetch("/api/packs/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPackError(data.error ?? "Could not open pack"); return; }
+      if (data.balanceAfter != null) setCash(data.balanceAfter);
+      else void refresh();
+      await load();
+      // Also refresh progression/xp in header
+      void refresh();
+    } finally { setOpening(false); }
+  };
 
   return (
     <>
@@ -93,23 +117,22 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                     <p className="t-num text-brass text-lg tabular-nums">
                       {money(packPrice as Cents)}
                     </p>
+                    {packError && (
+                      <p role="alert" className="text-loss mt-2 text-xs">{packError}</p>
+                    )}
                     <button
                       type="button"
-                      disabled={opening}
-                      onClick={async () => {
-                        setOpening(true);
-                        try {
-                          const res = await fetch("/api/packs/open", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ setId }),
-                          });
-                          if (res.ok) await load();
-                        } finally { setOpening(false); }
-                      }}
-                      className="bg-brass text-ink hover:bg-brass-hot mt-2 w-full rounded-pane px-3 py-2 text-xs font-semibold transition disabled:opacity-40"
+                      disabled={opening || !affordable}
+                      onClick={handleOpenPack}
+                      title={!affordable ? "Not enough cash" : undefined}
+                      className={cn(
+                        "mt-2 w-full rounded-pane px-3 py-2 text-xs font-semibold transition disabled:opacity-40",
+                        affordable
+                          ? "bg-brass text-ink hover:bg-brass-hot"
+                          : "bg-vitrine-3 text-manila-3 cursor-not-allowed ring-seam ring-1",
+                      )}
                     >
-                      {opening ? "Opening…" : "Open a pack"}
+                      {opening ? "Opening…" : affordable ? "Open a pack" : "Not enough cash"}
                     </button>
                   </div>
                 )}
@@ -186,7 +209,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
         <CardDetail
           cardId={inspecting}
           onClose={() => setInspecting(null)}
-          onChanged={load}
+          onChanged={() => { void load(); void refresh(); }}
         />
       )}
   </>

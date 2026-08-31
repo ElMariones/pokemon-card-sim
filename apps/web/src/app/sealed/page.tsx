@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
+import { usePlayer } from "@/components/PlayerProvider";
 import type { Cents } from "@pcs/shared";
 
 interface Offer {
@@ -19,6 +20,7 @@ interface Holding {
 }
 
 export default function SealedPage() {
+  const { player, refresh, setCash: setHeaderCash } = usePlayer();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [cash, setCash] = useState<number | null>(null);
@@ -26,6 +28,9 @@ export default function SealedPage() {
   const [busy, setBusy] = useState(false);
   const [opened, setOpened] = useState<{ label: string; totalValue: number; paid: number; cards: number } | null>(null);
   const [setFilter, setSetFilter] = useState("");
+
+  // Use header cash for affordability, but keep local cash in sync for fallback
+  const effectiveCash = player?.cash ?? cash;
 
   const load = useCallback(async () => {
     const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null));
@@ -46,7 +51,16 @@ export default function SealedPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong"); return null; }
+      if (data?.balanceAfter != null) setHeaderCash(data.balanceAfter);
+      if (data?.offer != null && data?.balanceAfter == null) {
+        // sellSealed returns balanceAfter, openSealed returns balanceAfter; buySealed doesn't yet
+      }
       await load();
+      void refresh();
+      // Ensure header reflects new balance even if endpoint didn't return it
+      if (data?.balanceAfter == null) {
+        // buySealed currently has no balanceAfter; fetch it via refresh (already queued)
+      }
       return data;
     } finally { setBusy(false); }
   };
@@ -184,7 +198,7 @@ export default function SealedPage() {
 
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((o) => {
-              const affordable = cash !== null && cash >= o.price;
+              const affordable = effectiveCash !== null && effectiveCash >= o.price;
               return (
                 <li key={o.productId} className="pane flex items-center gap-3 p-4">
                   {o.logoUrl && (

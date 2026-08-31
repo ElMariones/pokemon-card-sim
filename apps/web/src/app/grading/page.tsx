@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
+import { usePlayer } from "@/components/PlayerProvider";
 import type { Cents } from "@pcs/shared";
 
 interface Submission {
@@ -24,6 +25,7 @@ interface OwnedCard {
 }
 
 export default function GradingPage() {
+  const { player, refresh, setCash: setHeaderCash } = usePlayer();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [owned, setOwned] = useState<OwnedCard[]>([]);
@@ -31,6 +33,7 @@ export default function GradingPage() {
   const [cash, setCash] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const effectiveCash = player?.cash ?? cash;
 
   const load = useCallback(async () => {
     const [g, c, me] = await Promise.all([
@@ -76,8 +79,10 @@ export default function GradingPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not submit"); return; }
+      if (data.balanceAfter != null) setHeaderCash(data.balanceAfter);
       setPicked(null);
       await load();
+      void refresh();
     } finally { setBusy(false); }
   };
 
@@ -87,11 +92,11 @@ export default function GradingPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gradeId }),
     });
-    if (res.ok) await load();
+    if (res.ok) { await load(); void refresh(); }
   };
 
   const affordable = (t: Tier) =>
-    cash !== null && cash >= t.fee &&
+    effectiveCash !== null && effectiveCash >= t.fee &&
     (!picked || (picked.marketBasePrice ?? 0) <= t.maxDeclaredValue);
 
   return (

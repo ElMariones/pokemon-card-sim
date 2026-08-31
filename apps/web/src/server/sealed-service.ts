@@ -148,8 +148,9 @@ export async function buySealed(userId: string, setId: string, type: ProductType
   const { id, shape } = await ensureProduct(setId, type, packPrice);
   const price = sealedRetailPrice(packPrice, shape);
 
+  let balanceAfter: Cents;
   try {
-    await applyTransaction(db as never, {
+    const res = await applyTransaction(db as never, {
       userId,
       type: 'sealed_purchase',
       amount: cents(-price),
@@ -157,6 +158,7 @@ export async function buySealed(userId: string, setId: string, type: ProductType
       itemId: id,
       metadata: { setId, type, packs: shape.packs },
     });
+    balanceAfter = res.balanceAfter;
   } catch (err) {
     if (err instanceof InsufficientFundsError) {
       throw new GameError('Not enough cash for that product', 'insufficient_funds');
@@ -176,7 +178,7 @@ export async function buySealed(userId: string, setId: string, type: ProductType
     status: 'owned',
   });
 
-  return { inventoryId, productId: id, label: shape.label, packs: shape.packs, price };
+  return { inventoryId, productId: id, label: shape.label, packs: shape.packs, price, balanceAfter: balanceAfter! };
 }
 
 export interface SealedHolding {
