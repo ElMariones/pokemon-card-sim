@@ -332,28 +332,46 @@ export async function createListing(userId: string, inventoryItemId: string, ask
     throw new GameError('That is more than 50x market value', 'price_too_high');
   }
 
+  // Guard against relisting the same copy while it is already on the table.
+  // The partial unique index (status='active') is the real enforcer under race,
+  // but an explicit check gives a friendly error before we hit the constraint.
+  const [already] = await db
+    .select({ id: listings.id })
+    .from(listings)
+    .where(and(eq(listings.inventoryItemId, inventoryItemId), eq(listings.status, 'active')))
+    .limit(1);
+  if (already) throw new GameError('That card is already listed', 'already_listed');
+
   const id = randomUUID();
   const now = new Date();
 
-  await db.transaction(async (tx: any) => {
-    await tx.insert(listings).values({
-      id,
-      userId,
-      inventoryItemId,
-      cardId: item.cardId!,
-      askPrice,
-      marketValueAtListing: current.value,
-      status: 'active',
-      listedAt: now,
-      lastCheckedAt: now,
+  try {
+    await db.transaction(async (tx: any) => {
+      await tx.insert(listings).values({
+        id,
+        userId,
+        inventoryItemId,
+        cardId: item.cardId!,
+        askPrice,
+        marketValueAtListing: current.value,
+        status: 'active',
+        listedAt: now,
+        lastCheckedAt: now,
+      });
+      // The card leaves the collection while it is on the table, so it cannot be
+      // sold to the dealer and to a buyer at the same time.
+      await tx
+        .update(inventoryItems)
+        .set({ status: 'listed' })
+        .where(eq(inventoryItems.id, inventoryItemId));
     });
-    // The card leaves the collection while it is on the table, so it cannot be
-    // sold to the dealer and to a buyer at the same time.
-    await tx
-      .update(inventoryItems)
-      .set({ status: 'listed' })
-      .where(eq(inventoryItems.id, inventoryItemId));
-  });
+  } catch (err: any) {
+    // Race: two concurrent list requests both passed the check above; the
+    // partial unique index rejects the loser. Surface as a friendly error.
+    const isUniqueViolation = err?.code === '23505' || String(err?.message ?? '').includes('listings_item_uq');
+    if (isUniqueViolation) throw new GameError('That card is already listed', 'already_listed');
+    throw err;
+  }
 
   return { listingId: id, askPrice, marketValue: current.value };
 }

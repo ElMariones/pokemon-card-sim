@@ -1,6 +1,7 @@
 import {
   pgTable, text, integer, timestamp, jsonb, boolean, index, uniqueIndex, primaryKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * Conventions
@@ -281,5 +282,6 @@ export const listings = pgTable('listings', {
 }, (t) => [
   index('listings_user_status_idx').on(t.userId, t.status),
   index('listings_active_idx').on(t.status, t.lastCheckedAt),
-  uniqueIndex('listings_item_uq').on(t.inventoryItemId),
+  // Only one active listing per physical card; cancelled/sold rows stay for history
+  uniqueIndex('listings_item_uq').on(t.inventoryItemId).where(sql`${t.status} = 'active'`),
 ]);
