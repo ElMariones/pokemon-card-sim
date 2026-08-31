@@ -55,8 +55,10 @@ export default function PacksPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not open pack"); return; }
-      // Ensure setId survives even if server shape changes
+      const src = sets.find((s) => s.id === setId);
       if (!data.setId) data.setId = setId;
+      if (!data.logoUrl) data.logoUrl = src?.logoUrl ?? null;
+      if (!data.symbolUrl) data.symbolUrl = src?.symbolUrl ?? null;
       setOpening(data);
       setCash(data.balanceAfter);
     } finally { setBusy(false); }
@@ -148,12 +150,37 @@ export default function PacksPage() {
                 const affordable = player === null || player.cash >= s.packPrice;
                 return (
                   <li key={s.id} className="pane hover:ring-seam-bright flex items-center gap-4 p-4 transition">
-                    {s.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.logoUrl} alt="" className="h-12 w-20 shrink-0 object-contain" />
-                    ) : (
-                      <div className="bg-vitrine-3 h-12 w-20 shrink-0 rounded-slab" />
-                    )}
+                    {/* booster pack thumbnail — foil + logo/symbol instead of bare logo */}
+                    <div className="relative aspect-[2.5/3.5] w-16 shrink-0 overflow-hidden rounded-[8px] ring-1 ring-seam">
+                      <div className="wrapper-mylar absolute inset-0" />
+                      {s.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={s.logoUrl} alt="" className="absolute left-1/2 top-[44%] w-[78%] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)]" />
+                      ) : (
+                        <span className="t-display absolute left-1/2 top-[44%] w-[90%] -translate-x-1/2 -translate-y-1/2 text-center text-[9px] leading-tight text-white">{s.name}</span>
+                      )}
+                      {s.symbolUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={s.symbolUrl} alt="" className="absolute bottom-[22%] left-1/2 h-4 w-4 -translate-x-1/2 object-contain opacity-60 mix-blend-overlay" />
+                      )}
+                      <div
+                        className="absolute inset-x-0 top-0 h-[12%] bg-[#0a0e1a]"
+                        style={{
+                          clipPath:
+                            "polygon(0 0,100% 0,100% 60%,97% 40%,92% 60%,86% 36%,80% 58%,73% 32%,66% 54%,58% 28%,50% 50%,42% 24%,34% 48%,26% 20%,18% 44%,9% 18%,0 32%)",
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0 opacity-50"
+                          style={{
+                            background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.5) 0 2px, rgba(255,255,255,0.12) 2px 4px)",
+                          }}
+                        />
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1 pb-1.5 pt-4">
+                        <p className="truncate text-center text-[7px] font-semibold tracking-wide text-white/85">{s.name}</p>
+                      </div>
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{s.name}</p>
                       <p className="text-manila-3 text-[11px]">
