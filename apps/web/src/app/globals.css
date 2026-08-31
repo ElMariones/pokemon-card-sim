@@ -1,26 +1,337 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ===========================================================================
+   THE VITRINE — design tokens
+   ---------------------------------------------------------------------------
+   The app is a glass display case in a card shop after closing time. Every
+   surface is glass, brass and cardboard; the only saturated colour anywhere in
+   the chrome is borrowed light. Saturated hue belongs to the cards.
+
+   Rule that keeps it honest: the holo spectrum (--foil-*) is used ONLY on card
+   foil. No button, chart, badge or heading may use it. That is what makes a
+   holo pull read as an event rather than as more interface.
+   =========================================================================== */
+
+@theme {
+  /* --- case interior ------------------------------------------------ */
+  --color-ink: #080b13;
+  --color-vitrine: #10151f; /* panel */
+  --color-vitrine-2: #161d2b; /* raised panel / hover */
+  --color-vitrine-3: #1e2739; /* input wells, pressed */
+  --color-seam: #29334a; /* the aluminium extrusion between glass panes */
+  --color-seam-bright: #3b4661;
+
+  /* --- cardboard (text) --------------------------------------------- */
+  --color-manila: #e6dcc9;
+  --color-manila-2: #a49b8a;
+  --color-manila-3: #6d6759;
+
+  /* --- borrowed light (the single accent) --------------------------- */
+  --color-brass: #d3a03c;
+  --color-brass-hot: #f7cd72;
+  --color-brass-dim: #8a6a2a;
+
+  /* --- ledger ------------------------------------------------------- */
+  --color-gain: #74b28a;
+  --color-loss: #c46a5e;
+
+  /* --- foil spectrum. CARDS ONLY. ----------------------------------- */
+  --color-foil-1: #6fe6ff;
+  --color-foil-2: #a98cff;
+  --color-foil-3: #ff7ec2;
+  --color-foil-4: #ffd76b;
+  --color-foil-5: #8affc1;
+
+  /* --- type --------------------------------------------------------- */
+  --font-display: var(--font-archivo), "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), "DM Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* --- structure ---------------------------------------------------- */
+  --radius-slab: 2px;
+  --radius-pane: 6px;
+  --radius-card: 12px;
+
+  --ease-vitrine: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ---------------------------------------------------------------------------
+   Intensity. DESIGN.md §6: "the UI should gradually become more chaotic and
+   spectacular as the player's collection gets more valuable." That is a dial,
+   not a redesign — every level below drives the same properties, so a
+   component reads --glow / --sheen / --bloom and never asks what level it is.
+   0 shoebox · 1 binder · 2 showcase · 3 vault
+   --------------------------------------------------------------------------- */
+:root,
+[data-intensity="0"] {
+  --glow: 0; /* ambient bloom behind valuable things */
+  --sheen: 0; /* the specular sweep across glass panels */
+  --bloom: 0.35; /* multiplier on reveal glow */
+  --ambient: 0; /* case lighting on the page background */
+  --amp: 0.55; /* motion amplitude multiplier */
+}
+[data-intensity="1"] {
+  --glow: 0.35;
+  --sheen: 0.25;
+  --bloom: 0.7;
+  --ambient: 0.35;
+  --amp: 0.8;
+}
+[data-intensity="2"] {
+  --glow: 0.7;
+  --sheen: 0.6;
+  --bloom: 1;
+  --ambient: 0.7;
+  --amp: 1;
+}
+[data-intensity="3"] {
+  --glow: 1;
+  --sheen: 1;
+  --bloom: 1.35;
+  --ambient: 1;
+  --amp: 1.15;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  background: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink);
+  color: var(--color-manila);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The case lighting: two soft brass pools from above, plus the cold spill of
+   the shop window. Fades to nothing at intensity 0. */
+.vitrine-ambient::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--ambient);
+  transition: opacity 900ms var(--ease-vitrine);
+  background:
+    radial-gradient(120% 60% at 18% -10%, rgba(211, 160, 60, 0.16), transparent 60%),
+    radial-gradient(90% 50% at 88% -6%, rgba(111, 230, 255, 0.07), transparent 62%),
+    radial-gradient(140% 90% at 50% 120%, rgba(169, 140, 255, 0.06), transparent 70%);
+}
+
+/* --------------------------------------------------------------------------
+   Focus: brass, always visible, never removed.
+   -------------------------------------------------------------------------- */
+:where(a, button, [role="button"], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brass-hot);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--color-brass);
+  color: var(--color-ink);
+}
+
+/* Scrollbars stay inside the vitrine palette. */
+* {
+  scrollbar-color: var(--color-seam) transparent;
+  scrollbar-width: thin;
+}
+
+/* --------------------------------------------------------------------------
+   Type utilities
+   -------------------------------------------------------------------------- */
+.t-display {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 112;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-manila-3);
+}
+.t-num {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 100;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Panels — a pane of glass in an aluminium frame.
+   -------------------------------------------------------------------------- */
+.pane {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-vitrine-2) 70%, transparent),
+    var(--color-vitrine)
+  );
+  border: 1px solid var(--color-seam);
+  border-radius: var(--radius-pane);
+}
+/* The specular streak across the glass. Off at intensity 0. */
+.pane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: calc(var(--sheen) * 0.5);
+  background: linear-gradient(
+    104deg,
+    transparent 30%,
+    rgba(230, 220, 201, 0.06) 45%,
+    rgba(230, 220, 201, 0.01) 52%,
+    transparent 66%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Foil. Three stacked layers, all driven by --foil (0..1) so one property
+   turns the whole treatment up or down, and by the pointer position
+   (--px/--py, 0..1) so the sheen tracks the cursor like real cardstock.
+   -------------------------------------------------------------------------- */
+.foil-rainbow {
+  background:
+    repeating-linear-gradient(
+      -22deg,
+      rgba(111, 230, 255, 0.5) 0%,
+      rgba(169, 140, 255, 0.5) 9%,
+      rgba(255, 126, 194, 0.5) 17%,
+      rgba(255, 215, 107, 0.5) 25%,
+      rgba(138, 255, 193, 0.5) 33%,
+      rgba(111, 230, 255, 0.5) 42%
+    );
+  background-size: 260% 260%;
+  background-position: calc(var(--px, 0.5) * 100%) calc(var(--py, 0.5) * 100%);
+  mix-blend-mode: color-dodge;
+  opacity: calc(var(--foil, 0) * 0.5);
+}
+.foil-spec {
+  background: radial-gradient(
+    58% 42% at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.5) * 100%),
+    rgba(255, 252, 240, 0.55),
+    rgba(255, 252, 240, 0.1) 42%,
+    transparent 70%
+  );
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--foil, 0) * 0.95);
+}
+/* Etched cross-hatch — the texture pressed into modern holo stock. */
+.foil-etch {
+  background-image:
+    repeating-linear-gradient(48deg, rgba(255, 255, 255, 0.09) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-48deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 7px);
+  mix-blend-mode: overlay;
+  opacity: calc(var(--foil, 0) * 0.8);
+}
+
+/* The light bar that sweeps a card as it lands. */
+@keyframes foil-sweep {
+  from {
+    transform: translateX(-130%) skewX(-14deg);
+  }
+  to {
+    transform: translateX(230%) skewX(-14deg);
+  }
+}
+.animate-foil-sweep {
+  animation: foil-sweep var(--sweep-ms, 900ms) var(--ease-vitrine) forwards;
+}
+
+@keyframes case-shimmer {
+  0%,
+  100% {
+    opacity: calc(var(--ambient) * 0.55);
+  }
+  50% {
+    opacity: calc(var(--ambient) * 0.95);
+  }
+}
+
+@keyframes charge-ring {
+  from {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  60% {
+    opacity: calc(0.55 * var(--bloom));
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.animate-charge-ring {
+  animation: charge-ring var(--charge-ms, 900ms) var(--ease-vitrine) infinite;
+}
+
+@keyframes impact-shake {
+  0% { transform: translate3d(0,0,0); }
+  15% { transform: translate3d(calc(var(--shake) * -1px), calc(var(--shake) * 0.5px), 0); }
+  30% { transform: translate3d(calc(var(--shake) * 0.9px), calc(var(--shake) * -0.6px), 0); }
+  45% { transform: translate3d(calc(var(--shake) * -0.6px), calc(var(--shake) * 0.3px), 0); }
+  60% { transform: translate3d(calc(var(--shake) * 0.35px), calc(var(--shake) * -0.2px), 0); }
+  100% { transform: translate3d(0,0,0); }
+}
+.animate-impact {
+  animation: impact-shake 460ms var(--ease-snap);
+}
+
+/* Diagonal mylar texture for the booster wrapper. */
+.wrapper-mylar {
+  background-image:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(115deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 4px);
+}
+
+/* The crimped seal at the top of a booster pack. */
+.wrapper-crimp {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.34) 0 2px,
+    rgba(255, 255, 255, 0.12) 2px 4px
+  );
+}
+
+/* --------------------------------------------------------------------------
+   §32 Accessibility. Reduced motion is honoured at the CSS layer as well as in
+   JS, so nothing animates even if a component forgets to ask.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
