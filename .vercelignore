@@ -1,0 +1,9 @@
+# Local development database and imported archives are not deployable assets.
+# Production uses DATABASE_URL pointed at Supabase/Neon instead.
+data/pgdata/
+data/raw/
+data/cache/
+.env*
+node_modules/
+.next/
+*.tsbuildinfo

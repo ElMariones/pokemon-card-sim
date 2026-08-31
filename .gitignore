@@ -17,3 +17,4 @@ data/pgdata/
 
 # Raw imported source data (rebuildable via npm run data:all)
 data/raw/
+.env*
