@@ -175,6 +175,9 @@ body {
    Panels — a pane of glass in an aluminium frame.
    -------------------------------------------------------------------------- */
 .pane {
+  transition:
+    box-shadow 240ms var(--ease-vitrine),
+    border-color 240ms var(--ease-vitrine);
   position: relative;
   background: linear-gradient(
     180deg,
@@ -293,11 +296,52 @@ body {
   animation: impact-shake 460ms var(--ease-snap);
 }
 
-/* Diagonal mylar texture for the booster wrapper. */
+/* The booster wrapper.
+   It was previously texture-only over the page background, which made a sealed
+   pack read as a black rectangle. A pack is foil: it needs a base that catches
+   light before any texture goes on top. */
 .wrapper-mylar {
+  background-color: #1a2338;
   background-image:
-    repeating-linear-gradient(115deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 9px),
-    repeating-linear-gradient(115deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 4px);
+    /* specular band, angled across the pack */
+    linear-gradient(
+      118deg,
+      transparent 18%,
+      rgba(255, 255, 255, 0.13) 34%,
+      rgba(255, 255, 255, 0.03) 42%,
+      transparent 54%
+    ),
+    /* iridescence, kept restrained so it does not compete with the cards */
+    linear-gradient(
+      152deg,
+      rgba(111, 230, 255, 0.16) 0%,
+      rgba(169, 140, 255, 0.14) 34%,
+      rgba(255, 126, 194, 0.1) 62%,
+      rgba(255, 215, 107, 0.12) 100%
+    ),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.2) 0 1px, transparent 1px 4px),
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 62%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -18px 32px -18px rgba(0, 0, 0, 0.7),
+    0 18px 40px -18px rgba(0, 0, 0, 0.8);
+}
+
+/* A sealed pack lifts slightly under the pointer, so it reads as pick-up-able. */
+.wrapper-mylar {
+  transition:
+    transform 260ms var(--ease-snap),
+    box-shadow 260ms var(--ease-snap);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .wrapper-mylar:hover {
+    transform: translateY(-4px) rotate(-0.4deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -18px 32px -18px rgba(0, 0, 0, 0.7),
+      0 26px 52px -18px rgba(0, 0, 0, 0.9);
+  }
 }
 
 /* The crimped seal at the top of a booster pack. */
