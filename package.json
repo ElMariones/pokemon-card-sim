@@ -30,7 +30,8 @@
     "simulate": "tsx scripts/simulate/simulate-packs.ts",
     "data:fetch-prices": "tsx scripts/import/fetch-prices.ts",
     "data:apply-prices": "tsx scripts/import/apply-prices.ts",
-    "data:price-packs": "tsx scripts/simulate/price-packs.ts"
+    "data:price-packs": "tsx scripts/simulate/price-packs.ts",
+    "db:rebuild": "npm run db:reset && npm run db:push && npm run data:sets && npm run data:cards && npm run data:apply-prices && npm run data:price-packs"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

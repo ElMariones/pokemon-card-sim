@@ -67,7 +67,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ⬜ Per-set authored pack templates replacing era-derived estimates
 
 ## Milestone 10 — Advanced market / shop sim
-- ⬜ Listings, auctions, NPC customers, shop management
+- ✅ Player listings at any asking price, with the card held in escrow
+- ✅ NPC buyers arriving on a timer, resolved lazily and deterministically
+- ✅ Sale chance decaying with the asking ratio but never reaching zero, so an
+      over-priced card still sells eventually
+- ✅ 5% marketplace fee, so the stall beats the dealer without making it
+      pointless
+- ✅ Duplicate detection and one-click bulk sale, excluding favourites and
+      graded copies
+- ⬜ Auctions, buy orders, NPC shop with rent and reputation
 
 ## Milestone 11 — Polish / launch
 - ⬜ Mobile, performance, sound design, monitoring, economy balance pass

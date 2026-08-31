@@ -69,6 +69,16 @@ export async function GET(request: Request) {
   if (condition) filters.push(eq(inventoryItems.condition, condition));
   if (only === 'favorites') filters.push(eq(inventoryItems.favorite, true));
   if (only === 'graded') filters.push(sql`${grades.numericGrade} is not null`);
+  if (only === 'duplicates') {
+    // Cards the player holds more than one owned copy of. A correlated count
+    // rather than a join, so the page size and total stay correct.
+    filters.push(sql`(
+      select count(*) from inventory_items dup
+      where dup.card_id = ${inventoryItems.cardId}
+        and dup.user_id = ${inventoryItems.userId}
+        and dup.status = 'owned'
+    ) > 1`);
+  }
   if (q) {
     // Name or card number, so "charizard" and "006" both work.
     filters.push(or(ilike(cards.name, `%${q}%`), ilike(cards.number, `%${q}%`))!);

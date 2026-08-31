@@ -251,3 +251,195 @@ export async function getCollectionStats(userId: string): Promise<CollectionStat
       : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Duplicates
+// ---------------------------------------------------------------------------
+
+import { randomUUID } from 'node:crypto';
+import { dealerBuyOffer, computePrice, gradedValue, applyTransaction } from '@pcs/economy-engine';
+import { grades } from '@pcs/db/schema';
+
+export interface DuplicateGroup {
+  cardId: string;
+  name: string;
+  number: string;
+  rarityTier: RarityTier;
+  imageSmall: string | null;
+  setName: string;
+  owned: number;
+  /** How many are surplus, given the number to keep. */
+  surplus: number;
+  unitValue: Cents;
+  unitOffer: Cents;
+  surplusOffer: Cents;
+}
+
+/**
+ * Cards the player holds more than `keep` copies of.
+ *
+ * Graded and favourited copies are never counted as surplus: a graded copy is
+ * a different collectable from its raw twin, and a favourite is an explicit
+ * statement that this one is not spare. Selling either as "a duplicate" would
+ * destroy something the player deliberately kept.
+ */
+export async function getDuplicates(userId: string, keep = 1): Promise<DuplicateGroup[]> {
+  const db = await getDb();
+
+  const rows = await db
+    .select({
+      cardId: cards.id,
+      name: cards.name,
+      number: cards.number,
+      rarityTier: cards.rarityTier,
+      imageSmall: cards.imageSmall,
+      basePrice: cards.marketBasePrice,
+      setName: sets.name,
+      owned: sql<number>`count(*)::int`,
+      // Only plain, unfavourited, ungraded copies can be surplus.
+      spare: sql<number>`
+        count(*) filter (
+          where ${inventoryItems.favorite} = false
+            and ${grades.numericGrade} is null
+        )::int`,
+      worstCondition: sql<string>`min(${inventoryItems.condition})`,
+    })
+    .from(inventoryItems)
+    .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
+    .innerJoin(sets, eq(sets.id, cards.setId))
+    .leftJoin(
+      grades,
+      and(eq(grades.inventoryItemId, inventoryItems.id), eq(grades.status, 'completed')),
+    )
+    .where(and(eq(inventoryItems.userId, userId), eq(inventoryItems.status, 'owned')))
+    .groupBy(cards.id, sets.name)
+    .having(sql`count(*) > ${keep}`)
+    .orderBy(desc(sql`count(*)`));
+
+  return rows
+    .map((r) => {
+      const owned = Number(r.owned);
+      const spare = Number(r.spare);
+      // Keep `keep` copies overall, and never dip into protected ones.
+      const surplus = Math.max(0, Math.min(spare, owned - keep));
+      const unitValue = computePrice(cents(r.basePrice ?? 0), { condition: 'near_mint' });
+      const unitOffer = dealerBuyOffer(unitValue);
+      return {
+        cardId: r.cardId,
+        name: r.name,
+        number: r.number,
+        rarityTier: r.rarityTier as RarityTier,
+        imageSmall: r.imageSmall,
+        setName: r.setName,
+        owned,
+        surplus,
+        unitValue,
+        unitOffer,
+        surplusOffer: cents(unitOffer * surplus),
+      };
+    })
+    .filter((g) => g.surplus > 0);
+}
+
+export interface BatchSaleResult {
+  soldCount: number;
+  proceeds: Cents;
+  balanceAfter: Cents;
+  cards: { name: string; count: number; each: Cents }[];
+}
+
+/**
+ * Sell every surplus copy to the dealer in one go.
+ *
+ * The whole batch writes ONE ledger entry rather than one per card. A batch of
+ * three hundred bulk commons is a single decision and a single payment; three
+ * hundred rows would bury the ledger without telling anyone anything the
+ * metadata does not already record.
+ */
+export async function sellDuplicates(
+  userId: string,
+  keep = 1,
+  onlyCardIds?: string[],
+): Promise<BatchSaleResult> {
+  const db = await getDb();
+  const groups = (await getDuplicates(userId, keep)).filter(
+    (g) => !onlyCardIds || onlyCardIds.includes(g.cardId),
+  );
+
+  if (groups.length === 0) {
+    return { soldCount: 0, proceeds: cents(0), balanceAfter: cents(0), cards: [] };
+  }
+
+  const toSell: string[] = [];
+  const summary: { name: string; count: number; each: Cents }[] = [];
+  let proceeds = 0;
+
+  for (const g of groups) {
+    // Re-read the actual sellable copies rather than trusting the aggregate,
+    // and take the worst-conditioned ones first so the best copy is kept.
+    const copies = await db
+      .select({ id: inventoryItems.id, condition: inventoryItems.condition })
+      .from(inventoryItems)
+      .leftJoin(
+        grades,
+        and(eq(grades.inventoryItemId, inventoryItems.id), eq(grades.status, 'completed')),
+      )
+      .where(
+        and(
+          eq(inventoryItems.userId, userId),
+          eq(inventoryItems.cardId, g.cardId),
+          eq(inventoryItems.status, 'owned'),
+          eq(inventoryItems.favorite, false),
+          sql`${grades.numericGrade} is null`,
+        ),
+      )
+      .orderBy(
+        sql`case ${inventoryItems.condition}
+              when 'damaged' then 1 when 'heavily_played' then 2
+              when 'moderately_played' then 3 when 'lightly_played' then 4
+              else 5 end`,
+      );
+
+    const take = copies.slice(0, Math.max(0, copies.length - Math.max(0, keep)));
+    if (take.length === 0) continue;
+
+    for (const c of take) {
+      const value = computePrice(g.unitValue, {
+        condition: (c.condition ?? 'near_mint') as never,
+      });
+      proceeds += dealerBuyOffer(value);
+      toSell.push(c.id);
+    }
+    summary.push({ name: g.name, count: take.length, each: g.unitOffer });
+  }
+
+  if (toSell.length === 0) {
+    return { soldCount: 0, proceeds: cents(0), balanceAfter: cents(0), cards: [] };
+  }
+
+  await db
+    .update(inventoryItems)
+    .set({ status: 'sold' })
+    .where(inArray(inventoryItems.id, toSell));
+
+  const { balanceAfter } = await applyTransaction(db as never, {
+    userId,
+    type: 'card_sale',
+    amount: cents(proceeds),
+    itemType: 'batch',
+    itemId: null as never,
+    metadata: {
+      via: 'bulk_duplicates',
+      count: toSell.length,
+      keep,
+      cards: summary.map((s) => ({ name: s.name, count: s.count })),
+    },
+  });
+
+  return {
+    soldCount: toSell.length,
+    proceeds: cents(proceeds),
+    balanceAfter,
+    cards: summary,
+  };
+}

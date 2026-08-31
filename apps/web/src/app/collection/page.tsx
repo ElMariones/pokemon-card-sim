@@ -44,6 +44,11 @@ export default function CollectionPage() {
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [inspecting, setInspecting] = useState<string | null>(null);
+  const [dupes, setDupes] = useState<{
+    cardId: string; name: string; surplus: number; owned: number; surplusOffer: number;
+  }[] | null>(null);
+  const [dupeBusy, setDupeBusy] = useState(false);
+  const [dupeResult, setDupeResult] = useState<{ soldCount: number; proceeds: number } | null>(null);
 
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -191,6 +196,7 @@ export default function CollectionPage() {
           {[
             { id: "favorites", label: "★ Favourites" },
             { id: "graded", label: "Graded" },
+            { id: "duplicates", label: "Duplicates" },
           ].map((f) => (
             <button
               key={f.id}
@@ -234,6 +240,36 @@ export default function CollectionPage() {
           </button>
         )}
       </div>
+
+      {only === "duplicates" && (
+        <DuplicatesPanel
+          dupes={dupes}
+          busy={dupeBusy}
+          result={dupeResult}
+          onLoad={async () => {
+            const res = await fetch("/api/collection/duplicates?keep=1");
+            if (res.ok) setDupes((await res.json()).groups ?? []);
+          }}
+          onSellAll={async () => {
+            setDupeBusy(true);
+            try {
+              const res = await fetch("/api/collection/duplicates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ keep: 1 }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                setDupeResult({ soldCount: data.soldCount, proceeds: data.proceeds });
+                setDupes(null);
+                await load();
+                await loadFacets();
+                await refresh();
+              }
+            } finally { setDupeBusy(false); }
+          }}
+        />
+      )}
 
       {loading && items.length === 0 ? (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
@@ -342,6 +378,79 @@ export default function CollectionPage() {
           onChanged={() => { void load(); void loadFacets(); void refresh(); }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Bulk-selling duplicates.
+ *
+ * "Keep one" is the only mode offered on purpose: the point of the feature is
+ * clearing bulk without thinking about it, and a keep-count spinner turns a
+ * one-click action into a decision. Favourited and graded copies are excluded
+ * server-side, so nothing deliberately kept can be swept up by it.
+ */
+function DuplicatesPanel({
+  dupes, busy, result, onLoad, onSellAll,
+}: {
+  dupes: { cardId: string; name: string; surplus: number; owned: number; surplusOffer: number }[] | null;
+  busy: boolean;
+  result: { soldCount: number; proceeds: number } | null;
+  onLoad: () => Promise<void>;
+  onSellAll: () => Promise<void>;
+}) {
+  useEffect(() => { if (dupes === null) void onLoad(); }, [dupes, onLoad]);
+
+  const totalSurplus = (dupes ?? []).reduce((a, d) => a + d.surplus, 0);
+  const totalOffer = (dupes ?? []).reduce((a, d) => a + d.surplusOffer, 0);
+
+  if (result) {
+    return (
+      <div className="pane border-brass-dim mb-6 border p-4">
+        <p className="text-sm">
+          Sold <span className="t-num">{result.soldCount}</span> duplicate
+          {result.soldCount === 1 ? "" : "s"} for{" "}
+          <span className="t-num text-brass">{money(result.proceeds as Cents)}</span>.
+        </p>
+      </div>
+    );
+  }
+
+  if (dupes === null) {
+    return <p className="text-manila-3 pane mb-6 p-4 text-sm">Counting duplicates…</p>;
+  }
+
+  if (totalSurplus === 0) {
+    return (
+      <p className="text-manila-3 pane mb-6 p-4 text-sm">
+        No spare copies. Favourited and graded cards are never counted as duplicates.
+      </p>
+    );
+  }
+
+  return (
+    <div className="pane mb-6 flex flex-wrap items-center gap-4 p-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm">
+          <span className="t-num">{totalSurplus}</span> spare cop
+          {totalSurplus === 1 ? "y" : "ies"} across{" "}
+          <span className="t-num">{dupes.length}</span> card
+          {dupes.length === 1 ? "" : "s"}, keeping one of each.
+        </p>
+        <p className="text-manila-3 mt-0.5 text-[11px]">
+          Favourited and graded copies are excluded. The dealer pays{" "}
+          {money(totalOffer as Cents)} for the lot — the market stall would pay more,
+          but one card at a time.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onSellAll}
+        className="bg-brass text-ink hover:bg-brass-hot shrink-0 rounded-pane px-4 py-2.5 text-sm font-semibold transition disabled:opacity-40"
+      >
+        {busy ? "Selling…" : `Sell all for ${money(totalOffer as Cents)}`}
+      </button>
     </div>
   );
 }

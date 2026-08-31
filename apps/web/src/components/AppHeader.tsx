@@ -20,6 +20,7 @@ import { usePlayer } from "./PlayerProvider";
 const NAV = [
   { href: "/", label: "Packs" },
   { href: "/collection", label: "Collection", badge: "collection" as const },
+  { href: "/market", label: "Market" },
   { href: "/sealed", label: "Sealed" },
   { href: "/grading", label: "Grading" },
   { href: "/missions", label: "Missions" },

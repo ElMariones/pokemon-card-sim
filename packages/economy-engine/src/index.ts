@@ -8,3 +8,4 @@ export * from './market';
 export * from './progression';
 export * from './sealed';
 export * from './history';
+export * from './marketplace';

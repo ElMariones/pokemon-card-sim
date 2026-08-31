@@ -248,3 +248,38 @@ export const analyticsEvents = pgTable('analytics_events', {
   payload: jsonb('payload').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (t) => [index('analytics_name_idx').on(t.name, t.createdAt)]);
+
+/**
+ * Player marketplace listings (DESIGN.md section 10).
+ *
+ * One listing per inventory item, enforced by a unique index: a card cannot be
+ * on sale twice, and the constraint is what prevents a double-sale race rather
+ * than a check that happened a moment earlier.
+ *
+ * `visits` and `lastCheckedAt` are how elapsed time is resolved. Buyers arrive
+ * lazily when the player looks, and the consumed visits are persisted, so a
+ * refresh cannot re-roll a visitor who declined.
+ */
+export const listings = pgTable('listings', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  inventoryItemId: text('inventory_item_id').notNull()
+    .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+  cardId: text('card_id').notNull().references(() => cards.id),
+  askPrice: integer('ask_price').notNull(),
+  /** Market value when listed, so the ratio the player chose is recoverable. */
+  marketValueAtListing: integer('market_value_at_listing').notNull(),
+  status: text('status').notNull().default('active'),
+  visits: integer('visits').notNull().default(0),
+  listedAt: timestamp('listed_at').notNull().defaultNow(),
+  lastCheckedAt: timestamp('last_checked_at').notNull().defaultNow(),
+  soldAt: timestamp('sold_at'),
+  soldPrice: integer('sold_price'),
+  feePaid: integer('fee_paid'),
+  buyerName: text('buyer_name'),
+  buyerNote: text('buyer_note'),
+}, (t) => [
+  index('listings_user_status_idx').on(t.userId, t.status),
+  index('listings_active_idx').on(t.status, t.lastCheckedAt),
+  uniqueIndex('listings_item_uq').on(t.inventoryItemId),
+]);
