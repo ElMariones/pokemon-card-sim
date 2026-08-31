@@ -143,3 +143,15 @@ export function isGradingWorthwhile(rawValue: Cents, tier: ServiceTier): boolean
   const optimistic = applyBp(rawValue, GRADE_MULTIPLIER_BP[tier.company][9] ?? bp(10_000));
   return optimistic > rawValue + tier.fee;
 }
+
+/**
+ * Bulk discount: fee scales sublinearly so sending 20 at once is cheaper than
+ * 20 singles.  With exponent 0.85, 20 cards cost ~12.8× one fee instead of
+ * 20× — a ~36% saving, enough to matter but not enough to make singles
+ * pointless.  Rounded to whole cents; n is clamped to [1,20].
+ */
+export function bulkGradingFee(singleFee: Cents, n: number): Cents {
+  const count = Math.max(1, Math.min(20, Math.floor(n)));
+  if (count <= 1) return singleFee;
+  return cents(Math.round(singleFee * Math.pow(count, 0.85)));
+}

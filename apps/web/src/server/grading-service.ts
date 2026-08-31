@@ -5,7 +5,7 @@ import { grades, inventoryItems, cards } from '@pcs/db/schema';
 import { cents, type Cents, type Condition } from '@pcs/shared';
 import {
   SERVICE_TIERS, rollGrade, gradedValue, mulberry32, computePrice,
-  applyTransaction, InsufficientFundsError, type GradeResult,
+  applyTransaction, InsufficientFundsError, bulkGradingFee, type GradeResult,
 } from '@pcs/economy-engine';
 import { GameError } from './game';
 import { grantXp } from './progression-service';
@@ -53,11 +53,38 @@ export async function submitForGrading(
   inventoryId: string,
   serviceTierId: string,
 ) {
+  const r = await submitForGradingBulk(userId, [inventoryId], serviceTierId);
+  return {
+    gradeId: r.gradeIds[0]!,
+    gradeIds: r.gradeIds,
+    cardName: r.cards[0]?.cardName ?? '',
+    cards: r.cards,
+    company: r.company,
+    tierName: r.tierName,
+    fee: r.fee,
+    singleFee: r.singleFee,
+    count: 1,
+    readyAt: r.readyAt,
+    secondsRemaining: r.secondsRemaining,
+    balanceAfter: r.balanceAfter,
+  };
+}
+
+export async function submitForGradingBulk(
+  userId: string,
+  inventoryIds: string[],
+  serviceTierId: string,
+) {
   const db = await getDb();
   const tier = SERVICE_TIERS.find((t) => t.id === serviceTierId);
   if (!tier) throw new GameError(`No such service tier: ${serviceTierId}`, 'bad_tier');
 
-  const [item] = await db
+  const ids = [...new Set(inventoryIds.filter(Boolean))];
+  if (ids.length === 0) throw new GameError('Select at least one card', 'no_cards');
+  if (ids.length > 20) throw new GameError('At most 20 cards per submission', 'too_many');
+
+  const { inArray } = await import('drizzle-orm');
+  const items = await db
     .select({
       id: inventoryItems.id,
       status: inventoryItems.status,
@@ -67,32 +94,40 @@ export async function submitForGrading(
     })
     .from(inventoryItems)
     .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
-    .where(and(eq(inventoryItems.id, inventoryId), eq(inventoryItems.userId, userId)))
-    .limit(1);
+    .where(and(eq(inventoryItems.userId, userId), inArray(inventoryItems.id, ids)));
 
-  if (!item) throw new GameError('You do not own that card', 'not_owned');
-  if (item.status !== 'owned') throw new GameError('That card is not available', 'not_available');
-
-  const condition = (item.condition ?? 'near_mint') as Condition;
-  const rawValue = computePrice(cents(item.basePrice ?? 0), { condition });
-
-  if (rawValue > tier.maxDeclaredValue) {
-    throw new GameError(
-      `${tier.name} does not accept cards above ${tier.maxDeclaredValue / 100} in value`,
-      'value_too_high',
-    );
+  if (items.length !== ids.length) throw new GameError('You do not own every selected card', 'not_owned');
+  for (const it of items) {
+    if (it.status !== 'owned') throw new GameError(`Card ${it.cardName ?? it.id} is not available`, 'not_available');
+    const condition = (it.condition ?? 'near_mint') as Condition;
+    const rawValue = computePrice(cents(it.basePrice ?? 0), { condition });
+    if (rawValue > tier.maxDeclaredValue) {
+      throw new GameError(
+        `${it.cardName ?? it.id}: ${tier.name} does not accept cards above ${tier.maxDeclaredValue / 100} in value (raw ${rawValue / 100})`,
+        'value_too_high',
+      );
+    }
   }
 
-  // Charge the fee first; if the player cannot afford it nothing else happens.
+  const bulkFee = bulkGradingFee(tier.fee, ids.length);
+
+  // Charge the (bulk) fee first; if the player cannot afford it nothing else happens.
   let balanceAfter: Cents;
   try {
     const txRes = await applyTransaction(db as never, {
       userId,
       type: 'grading_fee',
-      amount: cents(-tier.fee),
+      amount: cents(-bulkFee),
       itemType: 'grading',
-      itemId: inventoryId,
-      metadata: { tier: tier.id, company: tier.company },
+      itemId: ids.length === 1 ? ids[0] : undefined,
+      metadata: {
+        tier: tier.id,
+        company: tier.company,
+        count: ids.length,
+        singleFee: tier.fee,
+        bulkFee,
+        inventoryIds: ids,
+      },
     });
     balanceAfter = txRes.balanceAfter;
   } catch (err) {
@@ -103,43 +138,53 @@ export async function submitForGrading(
   }
 
   const rng = mulberry32((Date.now() ^ Math.floor(Math.random() * 2 ** 31)) >>> 0);
-  const result = rollGrade(tier.company, condition, rng);
-
   const readyAt = new Date(
     Date.now() + tier.turnaroundHours * gradingSecondsPerHour() * 1000,
   );
-  const gradeId = randomUUID();
+
+  const gradeIds: string[] = [];
+  const cardsOut: { inventoryId: string; cardName: string; grade: import('@pcs/economy-engine').GradeResult }[] = [];
+  let gemCount = 0;
 
   await db.transaction(async (tx: any) => {
-    await tx.insert(grades).values({
-      id: gradeId,
-      userId,
-      inventoryItemId: inventoryId,
-      gradeCompany: tier.company,
-      serviceTier: tier.id,
-      numericGrade: result.numericGrade,
-      label: result.label,
-      submissionFee: tier.fee,
-      status: 'queued',
-      readyAt,
-    });
-    // The card leaves the collection while it is away, exactly as it would in
-    // real life. It cannot be sold from the queue.
-    await tx
-      .update(inventoryItems)
-      .set({ status: 'grading', gradingId: gradeId })
-      .where(eq(inventoryItems.id, inventoryId));
+    for (const it of items) {
+      const condition = (it.condition ?? 'near_mint') as Condition;
+      const result = rollGrade(tier.company, condition, rng);
+      if (result.numericGrade === 10) gemCount++;
+      const gradeId = randomUUID();
+      gradeIds.push(gradeId);
+      cardsOut.push({ inventoryId: it.id, cardName: it.cardName ?? '', grade: result });
+      await tx.insert(grades).values({
+        id: gradeId,
+        userId,
+        inventoryItemId: it.id,
+        gradeCompany: tier.company,
+        serviceTier: tier.id,
+        numericGrade: result.numericGrade,
+        label: result.label,
+        submissionFee: tier.fee,
+        status: 'queued',
+        readyAt,
+      });
+      await tx
+        .update(inventoryItems)
+        .set({ status: 'grading', gradingId: gradeId })
+        .where(eq(inventoryItems.id, it.id));
+    }
   });
 
-  await grantXp(userId, 'card_graded');
-  if (result.numericGrade === 10) await grantXp(userId, 'gem_mint_pulled');
+  await grantXp(userId, 'card_graded', ids.length);
+  if (gemCount > 0) await grantXp(userId, 'gem_mint_pulled', gemCount);
 
   return {
-    gradeId,
-    cardName: item.cardName ?? '',
+    gradeIds,
+    cards: cardsOut,
+    cardName: cardsOut[0]?.cardName ?? '',
     company: tier.company,
     tierName: tier.name,
-    fee: tier.fee,
+    fee: bulkFee,
+    singleFee: tier.fee,
+    count: ids.length,
     readyAt: readyAt.toISOString(),
     secondsRemaining: Math.ceil((readyAt.getTime() - Date.now()) / 1000),
     balanceAfter: balanceAfter!,
