@@ -265,9 +265,9 @@ function PackOpeningSession({
                 key={current.inventoryId + "-meta"}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2"
+                className="pointer-events-none absolute -bottom-3 left-1/2 z-[220] -translate-x-1/2"
               >
-                <GlassSurface className="flex min-w-max items-center gap-2 rounded-full px-3 py-2">
+                <GlassSurface className="relative z-[220] flex min-w-max items-center gap-2 rounded-full px-3 py-2">
                   <RaritySymbol tier={current.rarityTier} className="h-3 w-3 text-brass" />
                   <span className="text-xs font-semibold text-white">{current.name}</span>
                   <span className="text-manila-2 text-[11px]">#{current.number}</span>
