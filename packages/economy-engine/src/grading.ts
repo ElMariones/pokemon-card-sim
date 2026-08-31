@@ -65,24 +65,35 @@ export const GRADE_LABEL: Record<number, string> = {
  * the UI should present them as one.
  */
 const GRADE_WEIGHTS_BY_CONDITION: Record<Condition, readonly { value: number; weight: number }[]> = {
+  // Every condition can still hit a 10 — just with vanishing odds as wear
+  // worsens. Fee buys time (+ declared ceiling), not better odds
+  // (grading-service.ts picks tier for fee/turnaround, rollGrade only looks at
+  // condition+company). Weights sum to 1000 for fine granularity.
   near_mint: [
-    { value: 10, weight: 8 }, { value: 9, weight: 35 }, { value: 8, weight: 40 },
-    { value: 7, weight: 14 }, { value: 6, weight: 3 },
+    { value: 10, weight: 80 }, { value: 9, weight: 350 }, { value: 8, weight: 400 },
+    { value: 7, weight: 140 }, { value: 6, weight: 30 },
   ],
   lightly_played: [
-    { value: 9, weight: 10 }, { value: 8, weight: 34 }, { value: 7, weight: 36 },
-    { value: 6, weight: 15 }, { value: 5, weight: 5 },
+    { value: 10, weight: 15 }, { value: 9, weight: 85 }, { value: 8, weight: 330 },
+    { value: 7, weight: 350 }, { value: 6, weight: 150 }, { value: 5, weight: 45 },
+    { value: 4, weight: 15 }, { value: 3, weight: 10 },
   ],
   moderately_played: [
-    { value: 7, weight: 18 }, { value: 6, weight: 34 }, { value: 5, weight: 30 },
-    { value: 4, weight: 14 }, { value: 3, weight: 4 },
+    { value: 10, weight: 5 }, { value: 9, weight: 15 }, { value: 8, weight: 30 },
+    { value: 7, weight: 160 }, { value: 6, weight: 320 }, { value: 5, weight: 280 },
+    { value: 4, weight: 130 }, { value: 3, weight: 45 }, { value: 2, weight: 15 },
   ],
   heavily_played: [
-    { value: 5, weight: 20 }, { value: 4, weight: 34 }, { value: 3, weight: 30 },
-    { value: 2, weight: 16 },
+    { value: 10, weight: 2 }, { value: 9, weight: 5 }, { value: 8, weight: 10 },
+    { value: 7, weight: 20 }, { value: 6, weight: 40 }, { value: 5, weight: 160 },
+    { value: 4, weight: 330 }, { value: 3, weight: 280 }, { value: 2, weight: 150 },
+    { value: 1, weight: 3 },
   ],
   damaged: [
-    { value: 3, weight: 25 }, { value: 2, weight: 45 }, { value: 1, weight: 30 },
+    { value: 10, weight: 1 }, { value: 9, weight: 2 }, { value: 8, weight: 3 },
+    { value: 7, weight: 7 }, { value: 6, weight: 15 }, { value: 5, weight: 25 },
+    { value: 4, weight: 90 }, { value: 3, weight: 240 }, { value: 2, weight: 420 },
+    { value: 1, weight: 197 },
   ],
 };
 
