@@ -52,12 +52,17 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const [me, s, p] = await Promise.all([
-        fetch("/api/me").then((r) => r.json()),
+      // /api/me establishes the session cookie, and every other endpoint
+      // requires it. Fetching them in parallel raced on a first visit: the
+      // player did not exist yet, so progression 401'd and the level badge
+      // silently never appeared.
+      const me = await fetch("/api/me").then((r) => r.json());
+      setPlayer(me.player);
+
+      const [s, p] = await Promise.all([
         fetch("/api/sets?limit=200").then((r) => r.json()),
         fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
       ]);
-      setPlayer(me.player);
       if (p) setProg(p);
       setSets((s.sets ?? []).filter((x: SetRow) => x.openable));
       await loadCollection();
