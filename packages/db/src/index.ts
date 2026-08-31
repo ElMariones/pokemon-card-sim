@@ -18,24 +18,42 @@ export type Database =
   | ReturnType<typeof drizzlePglite<typeof schema>>
   | ReturnType<typeof drizzleNeon<typeof schema>>;
 
-let cached: Database | undefined;
+/**
+ * The connection is cached on globalThis, not in a module-level variable.
+ *
+ * A module-level cache is per module *instance*, and there are two ways to end
+ * up with more than one: importing this file through both '@pcs/db' and a
+ * relative path (the ESM loader treats those as different modules), and
+ * Next.js hot reload re-evaluating the module on every edit.
+ *
+ * With PGlite that is not a harmless duplicate — it opens a second connection
+ * to the same data directory, and writes made through one are invisible to the
+ * other. That produced a silent ledger drift where a balance update appeared
+ * to succeed and then vanished. globalThis is shared across all of them.
+ */
+const CACHE_KEY = Symbol.for('pcs.db.connection');
+type GlobalWithDb = typeof globalThis & { [CACHE_KEY]?: Database };
+const globalRef = globalThis as GlobalWithDb;
 
 export const isPgliteMode = () => !process.env.DATABASE_URL;
 
 export async function getDb(): Promise<Database> {
-  if (cached) return cached;
+  const existing = globalRef[CACHE_KEY];
+  if (existing) return existing;
 
   const url = process.env.DATABASE_URL;
   if (url) {
     const { Pool } = await import('@neondatabase/serverless');
-    cached = drizzleNeon(new Pool({ connectionString: url }), { schema });
-    return cached;
+    const db = drizzleNeon(new Pool({ connectionString: url }), { schema });
+    globalRef[CACHE_KEY] = db;
+    return db;
   }
 
   const { PGlite } = await import('@electric-sql/pglite');
   const dataDir = process.env.PGLITE_DATA_DIR ?? './data/pgdata';
-  cached = drizzlePglite(new PGlite(dataDir), { schema });
-  return cached;
+  const db = drizzlePglite(new PGlite(dataDir), { schema });
+  globalRef[CACHE_KEY] = db;
+  return db;
 }
 
 /** Test helper: an ephemeral in-memory database with no persistence. */

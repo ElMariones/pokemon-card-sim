@@ -41,6 +41,28 @@ npm run data:all     # import catalogue + prices
 npm run dev
 ```
 
+### PGlite is single-process. This will bite you.
+
+Only ONE OS process may hold `data/pgdata` at a time. Running an importer while
+the dev server is up does not queue or fail cleanly — it corrupts the data
+directory, and the next boot dies with a WASM `Aborted()` that names no cause.
+
+Stop the dev server before running any `data:*` script. If it does get
+corrupted, the fix is cheap because every importer is idempotent:
+
+```bash
+npm run db:reset && npm run db:push && npm run data:all
+```
+
+Neon has no such restriction, so this is a development-only hazard.
+
+Related: `getDb()` caches the connection on `globalThis`, not in a module
+variable. Importing this package through both `@pcs/db` and a relative path
+yields two module instances, and Next.js hot reload makes more — each would
+otherwise open its own PGlite connection to the same directory, and writes
+through one are invisible to the other. That failure mode looks like a balance
+update succeeding and then silently reverting.
+
 ## Data sources
 
 - Catalogue: `PokemonTCG/pokemon-tcg-data` bulk JSON on GitHub (no rate limit).
