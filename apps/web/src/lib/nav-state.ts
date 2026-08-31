@@ -17,11 +17,20 @@ export function useQueryState(key: string, defaultValue: string) {
 
   const setValue = useCallback(
     (next: string) => {
-      const params = new URLSearchParams(searchParams.toString());
+      // Read from window.location so sequential setQueryState calls in the same
+      // tick (e.g. setSort(v); setPage(1)) see each other's writes. The hook's
+      // searchParams snapshot is stale until the next render, so using it would
+      // let the second call overwrite the first.
+      const raw = typeof window !== "undefined" ? window.location.search : `?${searchParams.toString()}`;
+      const params = new URLSearchParams(raw);
       if (next === "" || next === defaultValue) params.delete(key);
       else params.set(key, next);
       const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      const url = qs ? `${pathname}?${qs}` : pathname;
+      // Sync window.history immediately so the next setter in this tick reads the
+      // updated query, then let Next's router catch up without scrolling.
+      if (typeof window !== "undefined") window.history.replaceState(null, "", url);
+      router.replace(url, { scroll: false });
     },
     [key, defaultValue, pathname, router, searchParams],
   );
