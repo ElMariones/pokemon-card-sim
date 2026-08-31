@@ -8,18 +8,23 @@ import { PackOpening, type OpeningView } from "@/components/PackOpening";
 import { CardTile } from "@/components/CardTile";
 import { CompletionBar } from "@/components/CompletionBar";
 import { LevelBadge } from "@/components/LevelBadge";
+import { CardDetail } from "@/components/CardDetail";
+import { GradedSlab } from "@/components/GradedSlab";
 import type { Cents } from "@pcs/shared";
 
 interface Player { id: string; cash: Cents; xp: number; level: number }
 interface SetRow {
   id: string; name: string; series: string; era: string; releaseDate: string;
   cardCount: number; pricedCount: number; avgPrice: number;
+  packPrice: number; packSize: number; pullConfidence: string;
   logoUrl: string | null; symbolUrl: string | null; openable: boolean;
 }
 interface CollectionItem {
   inventoryId: string; cardId: string; name: string; number: string;
   rarityTier: string; imageSmall: string | null; marketBasePrice: number | null;
   condition: string | null; setName: string;
+  grade: { company: string; numericGrade: number; label: string | null; isBlackLabel: boolean } | null;
+  rawValue: number; value: number; dealerOffer: number;
 }
 
 export default function Home() {
@@ -36,6 +41,7 @@ export default function Home() {
   const [prog, setProg] = useState<{
     level: number; title: string; progressBp: number; xpToNext: number | null;
   } | null>(null);
+  const [inspecting, setInspecting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"packs" | "collection">("packs");
@@ -203,6 +209,7 @@ export default function Home() {
                       <p className="truncate text-sm font-medium">{s.name}</p>
                       <p className="text-manila-3 text-[11px]">
                         {s.releaseDate.slice(0, 4)} · {s.cardCount} cards
+                        {s.packSize > 0 ? ` · ${s.packSize} per pack` : ""}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -214,11 +221,12 @@ export default function Home() {
                       </Link>
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || (player !== null && player.cash < s.packPrice)}
                         onClick={() => openPack(s.id)}
-                        className="bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam rounded-pane px-3 py-2 text-xs font-semibold ring-1 transition disabled:opacity-40"
+                        className="bg-vitrine-3 text-manila hover:bg-brass hover:text-ink ring-seam rounded-pane px-3 py-2 text-xs font-semibold tabular-nums ring-1 transition disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Open a ${s.name} pack for ${money(s.packPrice as Cents)}`}
                       >
-                        Open
+                        {money(s.packPrice as Cents)}
                       </button>
                     </div>
                   </li>
@@ -266,23 +274,51 @@ export default function Home() {
               <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
                 {collection.map((c) => (
                   <li key={c.inventoryId}>
-                    <CardTile
-                      name={c.name}
-                      number={c.number}
-                      rarityTier={c.rarityTier as never}
-                      imageUrl={c.imageSmall}
-                      condition={c.condition}
-                      value={(c.marketBasePrice ?? 0) as Cents}
-                      footer={
-                        <button
-                          type="button"
-                          onClick={() => sell(c.inventoryId)}
-                          className="text-manila-3 hover:text-brass mt-1 text-[11px] underline underline-offset-2"
+                    {c.grade ? (
+                      // A graded card reads as a slab everywhere it appears,
+                      // not only on the grading page.
+                      <button
+                        type="button"
+                        onClick={() => setInspecting(c.cardId)}
+                        className="w-full text-left focus-visible:outline-2 focus-visible:outline-brass rounded-[10px]"
+                        aria-label={`${c.name}, graded ${c.grade.company} ${c.grade.numericGrade}. Inspect.`}
+                      >
+                        <GradedSlab
+                          compact
+                          grade={c.grade}
+                          cardName={c.name}
+                          setName={c.setName}
+                          certSeed={c.inventoryId}
                         >
-                          Sell to dealer
-                        </button>
-                      }
-                    />
+                          {c.imageSmall && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={c.imageSmall}
+                              alt=""
+                              loading="lazy"
+                              className="aspect-[2.5/3.5] w-full object-cover"
+                            />
+                          )}
+                        </GradedSlab>
+                        <p className="mt-1.5 truncate text-[12px] font-medium">{c.name}</p>
+                        <p className="t-num text-brass text-[12px] tabular-nums">
+                          {money(c.value as Cents)}
+                          <span className="text-manila-3 ml-1 text-[10px]">
+                            raw {money(c.rawValue as Cents)}
+                          </span>
+                        </p>
+                      </button>
+                    ) : (
+                      <CardTile
+                        name={c.name}
+                        number={c.number}
+                        rarityTier={c.rarityTier as never}
+                        imageUrl={c.imageSmall}
+                        condition={c.condition}
+                        value={c.value as Cents}
+                        onClick={() => setInspecting(c.cardId)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -290,6 +326,19 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {inspecting && (
+        <CardDetail
+          cardId={inspecting}
+          onClose={() => setInspecting(null)}
+          onChanged={() => {
+            void loadCollection();
+            void fetch("/api/me").then(async (r) => {
+              if (r.ok) setPlayer((await r.json()).player);
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

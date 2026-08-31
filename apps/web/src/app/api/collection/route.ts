@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
-import { inventoryItems, cards, sets } from '@pcs/db/schema';
+import { inventoryItems, cards, sets, grades } from '@pcs/db/schema';
 import { requirePlayer } from '@/server/session';
+import { cents } from '@pcs/shared';
+import { computePrice, gradedValue, dealerBuyOffer } from '@pcs/economy-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
     .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
     .where(where);
 
-  const items = await db
+  const rows = await db
     .select({
       inventoryId: inventoryItems.id,
       condition: inventoryItems.condition,
@@ -42,14 +44,50 @@ export async function GET(request: Request) {
       marketBasePrice: cards.marketBasePrice,
       setId: sets.id,
       setName: sets.name,
+      // Only a collected grade counts. One still in the queue has not come
+      // back to the player, so the card is not a slab yet.
+      gradeCompany: grades.gradeCompany,
+      numericGrade: grades.numericGrade,
+      gradeLabel: grades.label,
     })
     .from(inventoryItems)
     .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
     .leftJoin(sets, eq(sets.id, cards.setId))
+    .leftJoin(
+      grades,
+      and(eq(grades.inventoryItemId, inventoryItems.id), eq(grades.status, 'completed')),
+    )
     .where(where)
     .orderBy(desc(inventoryItems.acquiredAt))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
+
+  // A graded card is worth its graded value, not its raw value, and the
+  // collection must say so — otherwise the grade the player paid for is
+  // invisible everywhere except the grading page.
+  const items = rows.map((r) => {
+    const raw = computePrice(cents(r.marketBasePrice ?? 0), {
+      condition: (r.condition ?? 'near_mint') as never,
+    });
+    const isGraded = r.numericGrade != null;
+    const grade = isGraded
+      ? {
+          company: r.gradeCompany as string,
+          numericGrade: r.numericGrade as number,
+          label: r.gradeLabel,
+          isBlackLabel: (r.gradeLabel ?? '').includes('Black Label'),
+        }
+      : null;
+    const value = grade ? gradedValue(raw, grade as never) : raw;
+
+    return {
+      ...r,
+      grade,
+      rawValue: raw,
+      value,
+      dealerOffer: dealerBuyOffer(value),
+    };
+  });
 
   return NextResponse.json({
     items,

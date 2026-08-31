@@ -8,6 +8,7 @@ import { money } from "@/lib/format";
 import { CompletionBar } from "@/components/CompletionBar";
 import { RaritySymbol } from "@/components/RaritySymbol";
 import { rarityDisplay } from "@/lib/rarity-display";
+import { CardDetail } from "@/components/CardDetail";
 import type { Cents, RarityTier } from "@pcs/shared";
 
 interface BinderCard {
@@ -30,6 +31,9 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   const [binder, setBinder] = useState<BinderCard[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  const [packPrice, setPackPrice] = useState<number | null>(null);
+  const [inspecting, setInspecting] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -39,6 +43,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
       const data = await res.json();
       setCompletion(data.completion);
       setBinder(data.binder ?? []);
+      setPackPrice(data.packPrice ?? null);
     }
     setLoading(false);
   }, [setId, filter]);
@@ -91,6 +96,32 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
               </div>
 
               <div className="lg:w-56">
+                {packPrice !== null && packPrice > 0 && (
+                  <div className="border-seam mb-4 border-b pb-4">
+                    <p className="t-eyebrow text-manila-3">Booster pack</p>
+                    <p className="t-num text-brass text-lg tabular-nums">
+                      {money(packPrice as Cents)}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={opening}
+                      onClick={async () => {
+                        setOpening(true);
+                        try {
+                          const res = await fetch("/api/packs/open", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ setId }),
+                          });
+                          if (res.ok) await load();
+                        } finally { setOpening(false); }
+                      }}
+                      className="bg-brass text-ink hover:bg-brass-hot mt-2 w-full rounded-pane px-3 py-2 text-xs font-semibold transition disabled:opacity-40"
+                    >
+                      {opening ? "Opening…" : "Open a pack"}
+                    </button>
+                  </div>
+                )}
                 <p className="t-eyebrow text-manila-3 mb-2">By rarity</p>
                 <ul className="space-y-1.5">
                   {completion.byRarity.map((r) => (
@@ -148,7 +179,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
             <ul className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10">
               {visible.map((c) => (
                 <li key={c.cardId}>
-                  <BinderSlot card={c} />
+                  <BinderSlot card={c} onInspect={() => setInspecting(c.cardId)} />
                 </li>
               ))}
             </ul>
@@ -159,6 +190,14 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
           </>
         )}
       </main>
+
+      {inspecting && (
+        <CardDetail
+          cardId={inspecting}
+          onClose={() => setInspecting(null)}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }
@@ -172,16 +211,34 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BinderSlot({ card }: { card: BinderCard }) {
+function BinderSlot({
+  card,
+  onInspect,
+}: {
+  card: BinderCard;
+  onInspect: () => void;
+}) {
   const owned = card.ownedCount > 0;
   const d = rarityDisplay(card.rarityTier);
 
   return (
-    <div className="group">
+    <button
+      type="button"
+      onClick={onInspect}
+      className="group w-full text-left focus-visible:outline-2 focus-visible:outline-brass rounded-[8px]"
+      aria-label={
+        `${card.name}, number ${card.number}, ${d.label}. ` +
+        `${owned ? `You own ${card.ownedCount}.` : "Not owned."} Inspect.`
+      }
+    >
       <div
         className={cn(
-          "relative aspect-[2.5/3.5] overflow-hidden rounded-[8px] ring-1 transition",
-          owned ? "ring-seam" : "ring-seam/40",
+          "relative aspect-[2.5/3.5] overflow-hidden rounded-[8px] ring-1 transition duration-200",
+          owned
+            // Owned cards carry a warm ring and lift slightly, so a filled
+            // page reads as filled at a glance without reading any labels.
+            ? "ring-brass-dim/70 group-hover:ring-brass motion-safe:group-hover:-translate-y-0.5"
+            : "ring-seam/50 group-hover:ring-seam-bright",
         )}
       >
         {card.imageSmall ? (
@@ -196,7 +253,11 @@ function BinderSlot({ card }: { card: BinderCard }) {
               "object-cover transition duration-300",
               // Missing cards are dimmed and desaturated rather than hidden, so
               // the shape of what is left to find stays visible at a glance.
-              owned ? "opacity-100" : "opacity-25 grayscale",
+              // They brighten on hover: the checklist is also where prices are
+              // inspected, and a card too dark to read is no use for that.
+              owned
+                ? "opacity-100"
+                : "opacity-40 grayscale-[0.9] group-hover:opacity-90 group-hover:grayscale-0",
             )}
           />
         ) : (
@@ -209,8 +270,11 @@ function BinderSlot({ card }: { card: BinderCard }) {
           </span>
         )}
         {!owned && (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <RaritySymbol tier={card.rarityTier} className="text-manila-3/60 h-4 w-4" />
+          <span
+            className="bg-ink/70 absolute bottom-1 left-1 grid h-4 w-4 place-items-center rounded-full transition group-hover:opacity-0"
+            title="Not owned"
+          >
+            <RaritySymbol tier={card.rarityTier} className="text-manila-2 h-2.5 w-2.5" />
           </span>
         )}
       </div>
@@ -223,6 +287,16 @@ function BinderSlot({ card }: { card: BinderCard }) {
       >
         #{card.number} {card.name}
       </p>
-    </div>
+      {card.marketBasePrice != null && card.marketBasePrice > 0 && (
+        <p
+          className={cn(
+            "t-num text-[10px] tabular-nums",
+            owned ? "text-manila-2" : "text-manila-3",
+          )}
+        >
+          {money(card.marketBasePrice as Cents)}
+        </p>
+      )}
+    </button>
   );
 }
