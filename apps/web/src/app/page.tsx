@@ -132,6 +132,7 @@ export default function Home() {
               </button>
             ))}
             {[
+              { href: "/sealed", label: "Sealed" },
               { href: "/grading", label: "Grading" },
               { href: "/missions", label: "Missions" },
             ].map((l) => (

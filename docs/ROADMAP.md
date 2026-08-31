@@ -21,8 +21,9 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 ## Milestone 2 — Card database pipeline
 - ✅ Import sets, cards, rarities, images with source tracking (174 sets, 20,440 cards)
 - ✅ Data-quality report (§34), all integrity checks passing
-- 🚧 Prices: 309 of 20,440 cards (Base Set + 151). Upstream API is flaky; the
-      importer is resumable, so the rest is a background job, not a rewrite.
+- ✅ Prices: 18,850 of 20,440 cards (92.2%). The remainder have no source
+      price at all and stay null rather than being invented.
+- ✅ Price pipeline split into fetch (network only) and apply (database only)
 - ⬜ Admin import tooling
 
 ## Milestone 3 — Multi-set pack engine
@@ -36,7 +37,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Milestone 5 — Economy v1
 - ✅ Dynamic pricing, NPC dealer buylist, transaction ledger
-- ⬜ Market simulation ticks and events (module not yet written)
+- ✅ Market simulation: mean-reverting drift plus scoped, directional events
+- ✅ Pack prices derived from simulating 4,000 openings per set; every set
+      returns 87.0%, so none is profitable to spam-open
+- ⬜ Market events wired into live prices in the UI
 - ⬜ Price history charts, profit/loss tracking
 
 ## Milestone 6 — Grading
@@ -44,10 +48,18 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ⬜ Graded-card selling flow
 
 ## Milestone 7 — Sealed market
-- ⬜ Sealed inventory, boxes/ETBs/tins, sealed price movement, open-vs-hold
+- ✅ Sealed inventory: bundles, ETBs, booster boxes, collection boxes, tins
+- ✅ Sealed value derived from simulated pack price, so all 136 priced sets
+      gain a lineup with no per-set data entry
+- ✅ Sealed drift with an age bonus; buy-then-resell is strictly lossy
+- ✅ Open-vs-hold, verified not to double-charge for the packs inside
+- ⬜ Sealed price history
 
 ## Milestone 8 — Progression
-- ⬜ XP, 10 collector levels, missions, unlocks (schema exists, logic does not)
+- ✅ XP, 10 collector levels, unlocks
+- ✅ Daily/weekly/long-term missions with progress derived from queries
+- ✅ Rewards claimable exactly once, enforced by a unique key
+- ⬜ Unlocks actually gating features in the UI (computed, not yet enforced)
 - ⬜ Achievements, cosmetics
 
 ## Milestone 9 — Full catalogue

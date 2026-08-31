@@ -6,3 +6,4 @@ export * from './grading';
 export * from './ledger';
 export * from './market';
 export * from './progression';
+export * from './sealed';
