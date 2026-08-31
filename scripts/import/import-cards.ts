@@ -13,7 +13,7 @@
  *   npx tsx scripts/import/import-cards.ts --missing     # only empty sets
  */
 import { sql, eq } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index';
+import { getDb, assertNotLocked } from '../../packages/db/src/index';
 import { sets, cards } from '../../packages/db/src/schema';
 import { normalizeRarity } from '../../packages/shared/src/index';
 import { fetchJson, NotFoundError, chunk, parseArgs, runScript } from './http';
@@ -40,6 +40,7 @@ interface SourceCard {
 const excluded = (column: string) => sql.raw(`excluded.${column}`);
 
 async function main() {
+  assertNotLocked();
   const args = parseArgs();
   const db = await getDb();
 

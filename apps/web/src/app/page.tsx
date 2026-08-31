@@ -7,6 +7,7 @@ import { money } from "@/lib/format";
 import { PackOpening, type OpeningView } from "@/components/PackOpening";
 import { CardTile } from "@/components/CardTile";
 import { CompletionBar } from "@/components/CompletionBar";
+import { LevelBadge } from "@/components/LevelBadge";
 import type { Cents } from "@pcs/shared";
 
 interface Player { id: string; cash: Cents; xp: number; level: number }
@@ -32,6 +33,9 @@ export default function Home() {
     setsStarted: number; setsCompleted: number;
     bestCard: { name: string; value: number; imageSmall: string | null } | null;
   } | null>(null);
+  const [prog, setProg] = useState<{
+    level: number; title: string; progressBp: number; xpToNext: number | null;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"packs" | "collection">("packs");
@@ -48,11 +52,13 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const [me, s] = await Promise.all([
+      const [me, s, p] = await Promise.all([
         fetch("/api/me").then((r) => r.json()),
         fetch("/api/sets?limit=200").then((r) => r.json()),
+        fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
       ]);
       setPlayer(me.player);
+      if (p) setProg(p);
       setSets((s.sets ?? []).filter((x: SetRow) => x.openable));
       await loadCollection();
     })();
@@ -71,6 +77,7 @@ export default function Home() {
       if (!res.ok) { setError(data.error ?? "Could not open pack"); return; }
       setOpening(data);
       setPlayer((p) => (p ? { ...p, cash: data.balanceAfter } : p));
+      void fetch("/api/progression").then(async (r) => { if (r.ok) setProg(await r.json()); });
     } finally {
       setBusy(false);
     }
@@ -119,18 +126,35 @@ export default function Home() {
                 ) : null}
               </button>
             ))}
-            <Link
-              href="/grading"
-              className="text-manila-3 hover:text-manila rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition"
-            >
-              Grading
-            </Link>
+            {[
+              { href: "/grading", label: "Grading" },
+              { href: "/missions", label: "Missions" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="text-manila-3 hover:text-manila rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition"
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
-          <div className="text-right">
-            <p className="t-eyebrow text-manila-3">Cash</p>
-            <p className="t-num text-brass tabular-nums">
-              {player ? money(player.cash) : "—"}
-            </p>
+          <div className="flex items-center gap-6">
+            {prog && (
+              <LevelBadge
+                className="hidden sm:flex"
+                level={prog.level}
+                title={prog.title}
+                progressBp={prog.progressBp}
+                xpToNext={prog.xpToNext}
+              />
+            )}
+            <div className="text-right">
+              <p className="t-eyebrow text-manila-3">Cash</p>
+              <p className="t-num text-brass tabular-nums">
+                {player ? money(player.cash) : "—"}
+              </p>
+            </div>
           </div>
         </div>
       </header>

@@ -4,7 +4,7 @@
  * Source: PokemonTCG/pokemon-tcg-data bulk JSON (no rate limit, no API key).
  * Idempotent: re-running updates in place rather than duplicating.
  */
-import { getDb } from '../../packages/db/src/index';
+import { getDb, assertNotLocked } from '../../packages/db/src/index';
 import { sets } from '../../packages/db/src/schema';
 import { deriveEra, isKnownSeries } from '../../packages/card-data/src/era';
 import { fetchJson, normalizeDate, chunk, runScript } from './http';
@@ -23,6 +23,7 @@ interface SourceSet {
 }
 
 async function main() {
+  assertNotLocked();
   console.log('Fetching set catalogue...');
   const source = await fetchJson<SourceSet[]>(SETS_URL);
   console.log(`  ${source.length} sets`);

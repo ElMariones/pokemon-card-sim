@@ -5,10 +5,11 @@
  * integrity check fails, so it can gate a deploy.
  */
 import { sql } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index';
+import { getDb, assertNotLocked } from '../../packages/db/src/index';
 import { runScript } from '../import/http';
 
 async function main() {
+  assertNotLocked();
   const db = await getDb();
   const q = async <T = Record<string, unknown>>(text: string): Promise<T[]> =>
     (await db.execute(sql.raw(text))).rows as T[];

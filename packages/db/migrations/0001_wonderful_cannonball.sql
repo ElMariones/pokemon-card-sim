@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "missions_user_template_uq" ON "missions" USING btree ("user_id","template_id");

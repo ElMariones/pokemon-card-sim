@@ -4,8 +4,8 @@
  */
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { sql } from 'drizzle-orm';
-import { getDb } from '../../packages/db/src/index';
+import { sql, eq, inArray } from 'drizzle-orm';
+import { getDb, assertNotLocked } from '../../packages/db/src/index';
 import { cards, marketState } from '../../packages/db/src/schema';
 import { selectBasePrice, type PriceSourceCard } from '../../packages/card-data/src/price-selection';
 import { chunk, parseArgs, runScript } from './http';
@@ -18,6 +18,7 @@ interface CachedCard extends PriceSourceCard {
 }
 
 async function main() {
+  assertNotLocked();
   const args = parseArgs();
   const db = await getDb();
 
@@ -34,6 +35,7 @@ async function main() {
   const now = new Date();
   let priced = 0;
   let unpriced = 0;
+  let orphaned = 0;
 
   for (const file of files) {
     const setId = file.replace(/\.json$/, '');
@@ -45,10 +47,21 @@ async function main() {
       continue;
     }
 
+    // The live price API carries sets and cards the bulk catalogue dataset does
+    // not yet have — the GitHub export lags the API. Writing those straight in
+    // violates the market_state foreign key, so prices are restricted to cards
+    // we actually hold and the difference is reported rather than swallowed.
+    const known = new Set(
+      (
+        await db.select({ id: cards.id }).from(cards).where(eq(cards.setId, setId))
+      ).map((r) => r.id),
+    );
+
     const updates: { id: string; price: number; confidence: string }[] = [];
     for (const c of cached) {
       const sel = selectBasePrice(c);
       if (sel.price === null) { unpriced++; continue; }
+      if (!known.has(c.id)) { orphaned++; continue; }
       updates.push({ id: c.id, price: sel.price, confidence: sel.confidence });
     }
 
@@ -83,6 +96,12 @@ async function main() {
   }
 
   console.log(`\nPriced ${priced} cards. ${unpriced} had no source price and stay null.`);
+  if (orphaned > 0) {
+    console.warn(
+      `${orphaned} priced cards are not in our catalogue (the price API is ahead of the ` +
+        'bulk dataset). Re-run import-cards when the export catches up.',
+    );
+  }
 }
 
 runScript(main);

@@ -25,11 +25,12 @@
     "data:sets": "tsx scripts/import/import-sets.ts",
     "data:cards": "tsx scripts/import/import-cards.ts",
     "data:prices": "npm run data:fetch-prices && npm run data:apply-prices",
-    "data:all": "npm run data:sets && npm run data:cards && npm run data:prices",
+    "data:all": "npm run data:sets && npm run data:cards && npm run data:prices && npm run data:price-packs",
     "data:validate": "tsx scripts/validate/validate-data.ts",
     "simulate": "tsx scripts/simulate/simulate-packs.ts",
     "data:fetch-prices": "tsx scripts/import/fetch-prices.ts",
-    "data:apply-prices": "tsx scripts/import/apply-prices.ts"
+    "data:apply-prices": "tsx scripts/import/apply-prices.ts",
+    "data:price-packs": "tsx scripts/simulate/price-packs.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

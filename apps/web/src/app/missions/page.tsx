@@ -1,0 +1,158 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { cn } from "@/lib/cn";
+import { money } from "@/lib/format";
+import { LevelBadge } from "@/components/LevelBadge";
+import type { Cents } from "@pcs/shared";
+
+interface Mission {
+  id: string; title: string; cadence: string; target: number;
+  progress: number; complete: boolean; claimed: boolean;
+  rewardCash: number; rewardXp: number;
+}
+interface Progression {
+  xp: number; level: number; title: string; nextTitle: string | null;
+  xpToNext: number | null; progressBp: number; unlocks: string[];
+  missions: { daily: Mission[]; weekly: Mission[]; long_term: Mission[] };
+}
+
+const CADENCE_LABEL: Record<string, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  long_term: "Long term",
+};
+
+export default function MissionsPage() {
+  const [prog, setProg] = useState<Progression | null>(null);
+  const [cash, setCash] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const [p, me] = await Promise.all([
+      fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/me").then((r) => (r.ok ? r.json() : null)),
+    ]);
+    if (p) setProg(p);
+    if (me) setCash(me.player?.cash ?? null);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const claim = async (missionId: string) => {
+    setError(null);
+    const res = await fetch("/api/progression/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ missionId }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error ?? "Could not claim"); return; }
+    await load();
+  };
+
+  return (
+    <div className="vitrine-ambient min-h-full">
+      <header className="border-seam/70 sticky top-0 z-20 border-b bg-ink/85 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3.5">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="t-display text-[15px] tracking-tight hover:text-brass transition">
+              PokeCard
+            </Link>
+            <span className="text-manila-3">/</span>
+            <span className="text-manila-2 text-sm">Missions</span>
+          </div>
+          <div className="flex items-center gap-6">
+            {prog && (
+              <LevelBadge
+                level={prog.level}
+                title={prog.title}
+                progressBp={prog.progressBp}
+                xpToNext={prog.xpToNext}
+              />
+            )}
+            {cash !== null && (
+              <p className="t-num text-brass tabular-nums">{money(cash as Cents)}</p>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main id="main" className="mx-auto max-w-5xl px-5 py-8">
+        {error && (
+          <p role="alert" className="text-loss ring-loss/40 mb-6 rounded-pane px-4 py-3 text-sm ring-1">
+            {error}
+          </p>
+        )}
+
+        <h1 className="t-display mb-1 text-2xl tracking-tight">Missions</h1>
+        <p className="text-manila-2 mb-8 max-w-2xl text-sm">
+          Completing a set is worth more than two hundred packs. That is deliberate — the
+          fastest way up is to finish what you started, not to keep buying.
+        </p>
+
+        {prog &&
+          (["daily", "weekly", "long_term"] as const).map((cadence) => {
+            const list = prog.missions[cadence] ?? [];
+            if (list.length === 0) return null;
+            return (
+              <section key={cadence} className="mb-8">
+                <h2 className="t-eyebrow text-manila-3 mb-3">{CADENCE_LABEL[cadence]}</h2>
+                <ul className="space-y-2">
+                  {list.map((m) => (
+                    <li key={m.id} className="pane flex items-center gap-4 p-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{m.title}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="bg-vitrine-3 h-1 max-w-[14rem] flex-1 overflow-hidden rounded-full">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-[width] duration-500",
+                                m.complete ? "bg-brass" : "bg-brass-dim",
+                              )}
+                              style={{ width: `${Math.min(100, (m.progress / m.target) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="t-mono text-manila-3 text-[11px] tabular-nums">
+                            {m.progress} / {m.target}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="t-num text-brass text-sm tabular-nums">
+                          {money(m.rewardCash as Cents)}
+                        </p>
+                        <p className="text-manila-3 t-mono text-[11px]">+{m.rewardXp} xp</p>
+                      </div>
+
+                      {m.claimed ? (
+                        <span className="text-manila-3 shrink-0 rounded-pane px-3 py-2 text-xs uppercase">
+                          Claimed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!m.complete}
+                          onClick={() => claim(m.id)}
+                          className={cn(
+                            "shrink-0 rounded-pane px-3 py-2 text-xs font-semibold transition",
+                            m.complete
+                              ? "bg-brass text-ink hover:bg-brass-hot"
+                              : "text-manila-3 ring-seam cursor-not-allowed ring-1",
+                          )}
+                        >
+                          {m.complete ? "Claim" : "Locked"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+      </main>
+    </div>
+  );
+}

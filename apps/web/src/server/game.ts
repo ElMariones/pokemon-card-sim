@@ -7,12 +7,13 @@ import {
 import { cents, type Cents, type RarityTier } from '@pcs/shared';
 import {
   openPack as simulatePack, deriveTemplate, isReverseEligible, createSeed,
-  type EngineCard,
+  expectedPackValue, type EngineCard,
 } from '@pcs/pack-engine';
 import {
   applyTransaction, InsufficientFundsError, dealerBuyOffer, derivePackPrice,
   computePrice, rollPackCondition, mulberry32,
 } from '@pcs/economy-engine';
+import { grantXp } from './progression-service';
 
 /**
  * The game service. Every economically meaningful decision happens here, on
@@ -61,20 +62,60 @@ async function loadEngineSet(setId: string) {
  * historical MSRP, because a 1999 pack priced at its 1999 price would be an
  * infinite money glitch against 2026 card values. See derivePackPrice.
  */
+/**
+ * Expected contents value of one pack of this set, weighted by the actual slot
+ * structure rather than by the mean card price.
+ *
+ * The mean is badly wrong here: a set's average card price is dragged upward
+ * by a handful of chase cards that a pack almost never contains. Pricing packs
+ * off the mean made them cost roughly four times what they returned — three
+ * 151 packs cost $79.80 and yielded about $20 of cards. Opening should be
+ * unprofitable on average (DESIGN.md section 30), but by a house edge, not by
+ * 300%.
+ *
+ * So each slot is valued at the average price of the rarities it can actually
+ * produce, weighted by that slot's real odds.
+ */
+async function expectedContentsValue(setId: string): Promise<Cents> {
+  const { set, engineCards, prices } = await loadEngineSet(setId);
+  const { template, tables } = deriveTemplate(set, engineCards);
+  const value = expectedPackValue(
+    template,
+    tables,
+    engineCards,
+    (cardId) => prices.get(cardId) ?? 0,
+  );
+  return cents(Math.round(value));
+}
+
+/**
+ * What a pack costs to buy.
+ *
+ * Derived from expected contents plus a house edge, never from historical
+ * MSRP: a 1999 pack sold at its 1999 price against 2026 card values would be
+ * an infinite money glitch.
+ */
 export async function getPackPrice(setId: string): Promise<Cents> {
   const db = await getDb();
-  const [row] = await db
-    .select({ avg: sql<number>`coalesce(avg(market_base_price), 0)::int` })
-    .from(cards)
-    .where(and(eq(cards.setId, setId), sql`market_base_price is not null`));
 
-  const avgCard = Number(row?.avg ?? 0);
-  // A pack is ~10 cards, but it is mostly commons, so the mean card value
-  // overstates it. Weighting by the actual slot mix happens in the balance
-  // pass; this is a deliberate approximation for the vertical slice.
-  const estimatedContents = cents(Math.round(avgCard * 2.5));
-  return derivePackPrice(estimatedContents);
+  // Prefer the simulated price written by scripts/simulate/price-packs.ts. It
+  // is measured by running the real engine, so it accounts for the
+  // no-duplicate rule that the closed-form estimate cannot.
+  const [stored] = await db
+    .select({ price: packTemplates.simulatorPrice })
+    .from(packTemplates)
+    .where(eq(packTemplates.id, `${setId}-booster`))
+    .limit(1);
+
+  if (stored?.price && stored.price > 0) return cents(stored.price);
+
+  // No cached price yet: fall back to the analytic estimate so a newly
+  // imported set is still playable before the pricing job has run.
+  return derivePackPrice(await expectedContentsValue(setId));
 }
+
+/** Exposed for the balance harness. */
+export { expectedContentsValue };
 
 /**
  * Persist a derived template and its tables so openings can reference them.
@@ -220,6 +261,24 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
   const opened: OpenedCard[] = [];
   let totalValue = 0;
 
+  // Which of these cards the player already had, read BEFORE the pack is
+  // written. Reading it afterwards would count every card as already owned,
+  // because the pack itself has just inserted them.
+  const pulledIds = new Set(result.cards.map((c) => c.cardId));
+  const ownedBefore = new Set(
+    (
+      await db
+        .select({ cardId: inventoryItems.cardId })
+        .from(inventoryItems)
+        .where(
+          and(
+            eq(inventoryItems.userId, userId),
+            inArray(inventoryItems.cardId, [...pulledIds]),
+          ),
+        )
+    ).map((r) => r.cardId as string),
+  );
+
   await db.transaction(async (tx: any) => {
     await tx.insert(openings).values({
       id: openingId,
@@ -280,6 +339,15 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
     await tx.update(openings).set({ totalValue: cents(totalValue) }).where(eq(openings.id, openingId));
   });
 
+  // XP is awarded after the opening is committed, so a failed write cannot
+  // leave a player levelled up for a pack they never received.
+  const firstTime = [...pulledIds].filter((id) => !ownedBefore.has(id)).length;
+
+  await grantXp(userId, 'pack_opened');
+  if (firstTime > 0) await grantXp(userId, 'new_card', firstTime);
+  const hits = opened.filter((c) => c.isHit).length;
+  if (hits > 0) await grantXp(userId, 'hit_pulled', hits);
+
   return {
     openingId,
     setId,
@@ -326,6 +394,8 @@ export async function sellCard(userId: string, inventoryId: string) {
     itemId: item.cardId ?? undefined,
     metadata: { inventoryId, marketValue: market, name: item.name },
   });
+
+  await grantXp(userId, 'card_sold');
 
   return { sold: item.name ?? '', marketValue: market, offer, balanceAfter };
 }

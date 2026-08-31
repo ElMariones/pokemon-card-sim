@@ -66,6 +66,43 @@ export async function getDb(): Promise<Database> {
  * database. Anchor to the workspace root instead, found by walking up for the
  * package.json that declares workspaces.
  */
+/**
+ * Fail fast when another process already holds the PGlite data directory.
+ *
+ * PGlite allows exactly one process at a time. Without this check a second
+ * process (typically a data script started while the dev server is up) simply
+ * blocks forever with no output, which is indistinguishable from a slow import
+ * and wastes minutes before anyone suspects a lock.
+ *
+ * The pid file can also be stale after a hard kill, so a pid that no longer
+ * exists is cleaned up rather than reported.
+ */
+export function assertNotLocked(dir = resolveDataDir()): void {
+  if (!isPgliteMode()) return;
+  const pidFile = path.join(dir, 'postmaster.pid');
+  if (!fs.existsSync(pidFile)) return;
+
+  const pid = Number(fs.readFileSync(pidFile, 'utf8').split('\n')[0]);
+  if (!Number.isFinite(pid) || pid <= 0) return;
+
+  let alive = false;
+  try {
+    process.kill(pid, 0);
+    alive = pid !== process.pid;
+  } catch {
+    alive = false;
+  }
+
+  if (alive) {
+    throw new Error(
+      `The database at ${dir} is held by process ${pid}.\n` +
+        'PGlite allows one process at a time — stop the dev server before running data scripts.',
+    );
+  }
+
+  fs.rmSync(pidFile, { force: true });
+}
+
 export function resolveDataDir(): string {
   const override = process.env.PGLITE_DATA_DIR;
   if (override) return path.resolve(override);

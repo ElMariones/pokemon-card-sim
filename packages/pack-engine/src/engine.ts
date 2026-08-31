@@ -188,3 +188,83 @@ function candidatePool(args: SelectArgs): EngineCard[] {
   }
   return out;
 }
+
+/**
+ * Expected value of one pack, weighted by the template's real slot structure.
+ *
+ * Prices are injected as a lookup rather than imported, so the engine stays
+ * free of the economy layer and of any database.
+ *
+ * The subtlety this exists to get right: a slot's candidate pool is not simply
+ * "every card of these rarities". A reverse-holo slot draws only from
+ * reverse-eligible cards, and those are not priced like the tier as a whole.
+ * Averaging over the full tier understated reverse slots enough to make one
+ * set profitable to spam-open, which is exactly the failure DESIGN.md section
+ * 30 warns about.
+ */
+export function expectedPackValue(
+  template: EnginePackTemplate,
+  tables: readonly EnginePullTable[],
+  cards: readonly EngineCard[],
+  priceOf: (cardId: string) => number,
+): number {
+  const tableById = new Map(tables.map((t) => [t.id, t]));
+
+  // Average price per rarity, computed separately for each candidate pool.
+  const meanFor = (tier: RarityTier, pool: 'all' | 'reverse_eligible'): number => {
+    let sum = 0;
+    let n = 0;
+    for (const c of cards) {
+      if (c.rarityTier !== tier) continue;
+      if (pool === 'reverse_eligible' && !c.reverseEligible) continue;
+      sum += priceOf(c.id);
+      n++;
+    }
+    return n === 0 ? 0 : sum / n;
+  };
+
+  const cache = new Map<string, number>();
+  const meanCached = (tier: RarityTier, pool: 'all' | 'reverse_eligible') => {
+    const key = `${tier}:${pool}`;
+    let v = cache.get(key);
+    if (v === undefined) {
+      v = meanFor(tier, pool);
+      cache.set(key, v);
+    }
+    return v;
+  };
+
+  let total = 0;
+  for (const slot of template.slots) {
+    const table = tableById.get(slot.tableId);
+    if (!table) continue;
+
+    if (table.selectionMode === 'weighted_card_pool') {
+      const weightTotal = table.entries.reduce((a, e) => a + Math.max(0, e.weight), 0);
+      if (weightTotal <= 0) continue;
+      for (const e of table.entries) {
+        if (e.weight <= 0) continue;
+        total += (e.weight / weightTotal) * priceOf(e.cardId);
+      }
+      continue;
+    }
+
+    const pool = table.pool === 'reverse_eligible' ? 'reverse_eligible' : 'all';
+    const weights = Object.entries(table.rarityWeights ?? {}) as [RarityTier, number][];
+
+    // Only rarities the pool can actually produce carry weight, matching how
+    // selectOnce filters at open time.
+    const live = weights.filter(
+      ([tier, w]) => (w ?? 0) > 0 && meanCached(tier, pool) >= 0 &&
+        cards.some((c) => c.rarityTier === tier && (pool === 'all' || c.reverseEligible)),
+    );
+    const weightTotal = live.reduce((a, [, w]) => a + (w ?? 0), 0);
+    if (weightTotal <= 0) continue;
+
+    for (const [tier, w] of live) {
+      total += ((w ?? 0) / weightTotal) * meanCached(tier, pool);
+    }
+  }
+
+  return total;
+}

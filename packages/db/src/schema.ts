@@ -232,7 +232,14 @@ export const missions = pgTable('missions', {
   rewardXp: integer('reward_xp').notNull().default(0),
   claimedAt: timestamp('claimed_at'),
   expiresAt: timestamp('expires_at'),
-}, (t) => [index('missions_user_idx').on(t.userId, t.cadence)]);
+}, (t) => [
+  index('missions_user_idx').on(t.userId, t.cadence),
+  // A mission reward is claimable once per window. templateId carries the
+  // window ('daily_open_3:2026-08-31'), so this unique key is what actually
+  // stops a player claiming the same reward on a loop — the check happens in
+  // the database, not in application code that a concurrent request can race.
+  uniqueIndex('missions_user_template_uq').on(t.userId, t.templateId),
+]);
 
 export const analyticsEvents = pgTable('analytics_events', {
   id: text('id').primaryKey(),

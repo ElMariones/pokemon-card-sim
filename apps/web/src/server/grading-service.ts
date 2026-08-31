@@ -8,6 +8,7 @@ import {
   applyTransaction, InsufficientFundsError, type GradeResult,
 } from '@pcs/economy-engine';
 import { GameError } from './game';
+import { grantXp } from './progression-service';
 
 /**
  * Grading submissions.
@@ -121,6 +122,9 @@ export async function submitForGrading(
       .set({ status: 'grading', gradingId: gradeId })
       .where(eq(inventoryItems.id, inventoryId));
   });
+
+  await grantXp(userId, 'card_graded');
+  if (result.numericGrade === 10) await grantXp(userId, 'gem_mint_pulled');
 
   return {
     gradeId,
