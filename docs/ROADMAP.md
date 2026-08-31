@@ -8,29 +8,35 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ Confirm data/image sources are reachable and usable
 - ✅ Normalized schema defined (`packages/db/src/schema.ts`)
 - ✅ Zero-install Postgres for development (PGlite), production-identical dialect
-- 🚧 One pack simulated end to end
-- 🚧 Pack opening animation prototype
+- ✅ One pack simulated end to end (100k-opening harness, deviations under 0.12pp)
+- ✅ Pack opening animation
 
 ## Milestone 1 — Vertical slice
 - ✅ Anonymous session + starting cash ($500, DESIGN.md §7)
-- 🚧 Pack purchase → open → collection → sell loop
-- ⬜ Persistent inventory verified end to end
+- ✅ Pack purchase → open → collection → sell loop
+- ✅ Persistent inventory verified end to end
+- ✅ Ledger audit: stored balance always equals the sum of transactions
+- ✅ Overdrafts refused
 
 ## Milestone 2 — Card database pipeline
-- 🚧 Import sets, cards, rarities, images, prices with source tracking
-- 🚧 Data-quality report (§34)
+- ✅ Import sets, cards, rarities, images with source tracking (174 sets, 20,440 cards)
+- ✅ Data-quality report (§34), all integrity checks passing
+- 🚧 Prices: 309 of 20,440 cards (Base Set + 151). Upstream API is flaky; the
+      importer is resumable, so the rest is a background job, not a rewrite.
 - ⬜ Admin import tooling
 
 ## Milestone 3 — Multi-set pack engine
-- 🚧 Data-driven templates, slot rules, pull tables with confidence levels
-- 🚧 100k-opening statistical test harness (§29)
+- ✅ Data-driven templates, slot rules, pull tables with confidence levels
+- ✅ 100k-opening statistical test harness (§29)
+- ⬜ Authored templates beyond the two flagship sets
 
 ## Milestone 4 — Collection experience
 - 🚧 Binder UI, set pages, filters, search, completion tracking
 - ⬜ Favorites, duplicate handling, collection statistics
 
 ## Milestone 5 — Economy v1
-- 🚧 Dynamic pricing, NPC dealer buylist, transaction ledger
+- ✅ Dynamic pricing, NPC dealer buylist, transaction ledger
+- ⬜ Market simulation ticks and events (module not yet written)
 - ⬜ Price history charts, profit/loss tracking
 
 ## Milestone 6 — Grading
@@ -41,11 +47,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ⬜ Sealed inventory, boxes/ETBs/tins, sealed price movement, open-vs-hold
 
 ## Milestone 8 — Progression
-- 🚧 XP, 10 collector levels, missions, unlocks
+- ⬜ XP, 10 collector levels, missions, unlocks (schema exists, logic does not)
 - ⬜ Achievements, cosmetics
 
 ## Milestone 9 — Full catalogue
-- 🚧 Full historical import (~170 sets)
+- ✅ Full historical import (174 sets)
 - ⬜ Per-set authored pack templates replacing era-derived estimates
 
 ## Milestone 10 — Advanced market / shop sim
