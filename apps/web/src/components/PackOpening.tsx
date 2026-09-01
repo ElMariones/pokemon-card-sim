@@ -73,32 +73,72 @@ function PackOpeningSession({
   const [phase, setPhase] = useState<Phase>("sealed");
   const [index, setIndex] = useState(-1);
   const [faceUpIndex, setFaceUpIndex] = useState(-1);
+  // Whether the card's artwork is actually showing. Reported by the card
+  // itself, so the label can never appear over a face-down card.
+  const [frontVisible, setFrontVisible] = useState(false);
   const liveRef = useRef<HTMLParagraphElement>(null);
 
   const cards = opening.cards;
   const current = index >= 0 ? cards[index] : undefined;
+
+  /**
+   * Only the card currently on top may drive the label. A departing card
+   * unmounts after its flight, so without this guard its final report lands
+   * after the next card has been turned and hides that card's label.
+   */
+  const handleFaceChange = useCallback(
+    (faceUp: boolean, cardId: string | number) => {
+      if (cardId !== current?.inventoryId) return;
+      setFrontVisible(faceUp);
+    },
+    [current?.inventoryId],
+  );
 
   const skip = useCallback(() => {
     setIndex(cards.length);
     setPhase("summary");
   }, [cards.length]);
 
+  useEffect(() => { setFrontVisible(false); }, [index]);
+
+  /**
+   * A card takes about a third of a second to fly out and the next one to
+   * settle. Without a lock a second click inside that window is applied to a
+   * state that is still changing, and one tap both dismissed a card and turned
+   * over its replacement — so a card appeared already face-up.
+   */
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    if (!locked) return;
+    const t = window.setTimeout(() => setLocked(false), 380);
+    return () => window.clearTimeout(t);
+  }, [locked]);
+
   const advance = useCallback(() => {
+    if (locked) return;
+    setLocked(true);
+    setFrontVisible(false);
     if (index >= cards.length - 1) {
       setIndex(cards.length);
       setPhase("summary");
       return;
     }
     setIndex((i) => i + 1);
-  }, [cards.length, index]);
+  }, [cards.length, index, locked]);
+
+  const reveal = useCallback(() => {
+    if (locked) return;
+    setFaceUpIndex(index);
+  }, [index, locked]);
 
   const revealOrAdvance = useCallback(() => {
+    if (locked) return;
     if (faceUpIndex !== index) {
-      setFaceUpIndex(index);
+      reveal();
       return;
     }
     advance();
-  }, [advance, faceUpIndex, index]);
+  }, [advance, faceUpIndex, index, locked, reveal]);
 
   const startTear = useCallback(() => {
     if (phase !== "sealed") return;
@@ -254,17 +294,19 @@ function PackOpeningSession({
             <SlidingCards
               cards={slidingData}
               activeIndex={index}
-              revealedIndex={faceUpIndex}
+              revealed={faceUpIndex === index}
+              onFaceChange={handleFaceChange}
               className="w-[300px] h-[420px] sm:w-[340px] sm:h-[480px]"
-              onReveal={() => setFaceUpIndex(index)}
+              onReveal={reveal}
               onAdvance={advance}
             />
             {/* current card meta overlay */}
-            {current && faceUpIndex === index && (
+            {current && frontVisible && (
               <motion.div
                 key={current.inventoryId + "-meta"}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18 }}
                 className="pointer-events-none absolute -bottom-3 left-1/2 z-[220] -translate-x-1/2"
               >
                 <GlassSurface className="relative z-[220] flex min-w-max items-center gap-2 rounded-full px-3 py-2">
