@@ -10,6 +10,7 @@ import { CardTile } from "./CardTile";
 import { RaritySymbol } from "./RaritySymbol";
 import SlidingCards from "./lightswind/sliding-cards";
 import { GlassSurface } from "./GlassSurface";
+import { BoosterPackArt } from "./BoosterPackArt";
 import { CONFIDENCE_LABEL, type Cents, type RarityTier, type Confidence } from "@pcs/shared";
 
 export interface OpenedCardView {
@@ -152,10 +153,12 @@ function PackOpeningSession({
 
   useEffect(() => {
     if (phase !== "tearing") return;
+    // Long enough for the strip to actually leave the wrapper and for the
+    // recoil to settle. At 620ms the tear was over before it registered.
     const timeout = window.setTimeout(() => {
       setPhase("revealing");
       setIndex(0);
-    }, 620);
+    }, 950);
     return () => window.clearTimeout(timeout);
   }, [phase]);
 
@@ -226,6 +229,7 @@ function PackOpeningSession({
           className="flex flex-col items-center gap-6"
         >
           <BoosterPack
+            setId={opening.setId}
             setName={opening.setName}
             logoUrl={opening.logoUrl ?? null}
             symbolUrl={opening.symbolUrl ?? null}
@@ -248,6 +252,7 @@ function PackOpeningSession({
           className="flex flex-col items-center gap-6"
         >
           <BoosterPack
+            setId={opening.setId}
             setName={opening.setName}
             logoUrl={opening.logoUrl ?? null}
             symbolUrl={opening.symbolUrl ?? null}
@@ -277,6 +282,7 @@ function PackOpeningSession({
           >
             <div className="relative aspect-[2.5/3.5] w-40 opacity-30">
               <BoosterPack
+                setId={opening.setId}
                 setName={opening.setName}
                 logoUrl={opening.logoUrl ?? null}
                 symbolUrl={opening.symbolUrl ?? null}
@@ -481,151 +487,60 @@ function PackOpeningSession({
 }
 
 function BoosterPack({
+  setId,
   setName,
   logoUrl,
-  symbolUrl,
   phase,
   reduceMotion,
   onRip,
   compact = false,
 }: {
+  setId?: string | null;
   setName: string;
   logoUrl: string | null;
-  symbolUrl: string | null;
+  symbolUrl?: string | null;
   phase: "sealed" | "tearing" | "open";
   reduceMotion: boolean;
   onRip: () => void;
   compact?: boolean;
 }) {
+  const sealed = phase === "sealed";
+
   return (
     <motion.button
       type="button"
-      onClick={onRip}
-      disabled={phase !== "sealed"}
-      initial={phase === "tearing" ? { scale: 1, y: 0, rotate: 0 } : false}
+      onClick={sealed ? onRip : undefined}
+      disabled={!sealed}
+      // The pack recoils as the strip is pulled, then settles. A wrapper that
+      // simply swaps to a torn state does not read as having been opened.
       animate={
-        phase === "tearing"
-          ? { scale: [1, 1.025, 0.98], y: [0, 4, 18], rotate: [0, -1.4, 1.8] }
-          : { scale: 1, y: 0, rotate: 0 }
+        reduceMotion
+          ? undefined
+          : phase === "tearing"
+            ? { y: [0, -10, 4, 0], rotate: [0, -1.6, 0.8, 0], scale: [1, 1.03, 0.99, 1] }
+            : { y: 0, rotate: 0, scale: 1 }
       }
-      whileHover={phase === "sealed" && !reduceMotion ? { y: -6, rotate: -0.6 } : undefined}
-      whileTap={phase === "sealed" && !reduceMotion ? { scale: 0.98 } : undefined}
-      transition={{ type: "spring", stiffness: 420, damping: 22 }}
+      transition={{ duration: phase === "tearing" ? 0.6 : 0.3, ease: [0.3, 0, 0.2, 1] }}
+      whileHover={sealed && !reduceMotion ? { y: -8, rotate: -0.8, scale: 1.02 } : undefined}
+      whileTap={sealed && !reduceMotion ? { scale: 0.98 } : undefined}
       className={cn(
-        "group relative overflow-hidden rounded-[14px] ring-1 ring-seam focus-visible:outline-2 focus-visible:outline-brass",
-        compact ? "aspect-[2.5/3.5] w-44" : "aspect-[2.5/3.5] w-56 sm:w-64",
-        phase !== "sealed" && "cursor-default",
+        "relative block aspect-[250/350] drop-shadow-[0_26px_44px_rgba(0,0,0,0.7)]",
+        compact ? "w-40" : "w-60 sm:w-72",
+        sealed
+          ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
+          : "cursor-default",
       )}
-      aria-label={phase === "sealed" ? `Rip open your ${setName} pack` : `${setName} pack, torn open`}
+      aria-label={sealed ? `Rip open your ${setName} pack` : `${setName} pack, torn open`}
     >
-      {/* foil body */}
-      <div className="wrapper-mylar absolute inset-0" />
-
-      {/* subtle vertical mylar streaks */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40 mix-blend-overlay"
-        style={{
-          background:
-            "repeating-linear-gradient(100deg, transparent 0 8px, rgba(255,255,255,0.04) 8px 9px, transparent 9px 18px)",
-        }}
+      <BoosterPackArt
+        setId={setId}
+        setName={setName}
+        logoUrl={logoUrl}
+        phase={phase}
+        reduceMotion={reduceMotion}
       />
-
-      {/* pack artwork — logo centered, symbol watermark */}
-      {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={logoUrl}
-          alt=""
-          className={cn(
-            "absolute left-1/2 top-[42%] w-[78%] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]",
-            compact ? "w-[70%]" : "w-[78%]",
-          )}
-          draggable={false}
-        />
-      ) : (
-        <span className="t-display absolute left-1/2 top-[42%] w-[85%] -translate-x-1/2 -translate-y-1/2 text-center text-[15px] leading-tight tracking-tight text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
-          {setName}
-        </span>
-      )}
-
-      {symbolUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={symbolUrl}
-          alt=""
-          className="pointer-events-none absolute bottom-[28%] left-1/2 h-6 w-6 -translate-x-1/2 object-contain opacity-70 mix-blend-overlay"
-          draggable={false}
-        />
-      )}
-
-      {/* bottom bar with set name */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 pb-3 pt-8">
-        <p className="t-display line-clamp-1 text-center text-[11px] tracking-[0.12em] text-white/90">
-          {setName}
-        </p>
-        {!compact && (
-          <p className="text-manila-2 mt-0.5 text-center text-[9px] tracking-[0.18em] uppercase opacity-80">
-            {phase === "sealed" ? "Tap to rip" : phase === "tearing" ? "Ripping…" : "Opened"}
-          </p>
-        )}
-      </div>
-
-      {/* crimp — the serrated seal */}
-      <motion.div
-        className="absolute inset-x-0 top-0 h-[13%] overflow-hidden bg-[#0a0e1a]"
-        initial={phase === "tearing" ? { y: 0, rotate: 0, x: 0, opacity: 1 } : false}
-        style={{
-          clipPath:
-            "polygon(0 0,100% 0,100% 58%,97% 42%,93% 62%,88% 38%,83% 60%,78% 34%,73% 58%,68% 30%,63% 55%,58% 28%,52% 52%,47% 26%,42% 50%,37% 22%,32% 48%,27% 20%,22% 45%,17% 18%,12% 42%,7% 16%,3% 36%,0 30%)",
-        }}
-        animate={
-          reduceMotion
-            ? {}
-            : phase === "tearing"
-              ? { y: -48, rotate: -14, x: 8, opacity: 0 }
-              : phase === "open"
-                ? { y: -48, opacity: 0 }
-                : { y: 0, rotate: 0, opacity: 1 }
-        }
-        transition={
-          phase === "tearing"
-            ? { type: "spring", stiffness: 520, damping: 18, mass: 0.7 }
-            : { duration: 0.2 }
-        }
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "repeating-linear-gradient(90deg, rgba(0,0,0,0.55) 0 3px, rgba(255,255,255,0.14) 3px 6px)",
-          }}
-        />
-        {/* little tear pull tab */}
-        {phase === "sealed" && (
-          <motion.div
-            animate={{ x: [0, 2, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute right-3 top-1/2 h-1.5 w-8 -translate-y-1/2 rounded-full bg-brass/70"
-          />
-        )}
-      </motion.div>
-
-      {phase === "tearing" && (
-        <PackPeelFlap />
-      )}
-
-      {/* slit highlight when torn */}
-      {phase !== "sealed" && (
-        <motion.div
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 1 }}
-          transition={{ delay: 0.18, duration: 0.22 }}
-          className="absolute left-3 right-3 top-[13%] h-[3px] origin-center rounded-full bg-ink blur-[0.5px]"
-        />
-      )}
-
-      {/* spring layout for cards peeking — handled by parent, but keep slit shadow */}
-      <div className="pointer-events-none absolute inset-0 rounded-[14px] ring-1 ring-white/10" />
+      {/* The surrounding view owns the instructional copy; a caption here as
+          well printed "Ripping…" twice, once from each. */}
     </motion.button>
   );
 }
