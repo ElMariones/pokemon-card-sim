@@ -180,7 +180,11 @@ export const grades = pgTable('grades', {
   submittedAt: timestamp('submitted_at').notNull().defaultNow(),
   readyAt: timestamp('ready_at').notNull(),
   completedAt: timestamp('completed_at'),
-}, (t) => [index('grades_user_idx').on(t.userId, t.status)]);
+}, (t) => [
+  index('grades_user_idx').on(t.userId, t.status),
+  // A physical inventory copy can only ever receive one grade.
+  uniqueIndex('grades_inventory_item_uq').on(t.inventoryItemId),
+]);
 
 /** Every action that moves money writes one of these. The ledger is the truth. */
 export const transactions = pgTable('transactions', {

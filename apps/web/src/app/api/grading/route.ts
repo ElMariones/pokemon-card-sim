@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { requirePlayer } from '@/server/session';
-import { listSubmissions, listServiceTiers } from '@/server/grading-service';
+import { listGradeableCards, listSubmissions, listServiceTiers } from '@/server/grading-service';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const player = await requirePlayer();
   if (!player) return NextResponse.json({ error: 'No session' }, { status: 401 });
-  return NextResponse.json({
-    submissions: await listSubmissions(player.id),
-    tiers: listServiceTiers(),
-  });
+  const [submissions, candidates] = await Promise.all([
+    listSubmissions(player.id),
+    listGradeableCards(player.id),
+  ]);
+  return NextResponse.json({ submissions, candidates, tiers: listServiceTiers() });
 }

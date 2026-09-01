@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql, desc } from 'drizzle-orm';
-import { getDb } from '@pcs/db';
-import { grades, inventoryItems, cards } from '@pcs/db/schema';
+import { and, eq, desc, notExists } from 'drizzle-orm';
+import { getDb, type Database } from '@pcs/db';
+import { grades, inventoryItems, cards, sets } from '@pcs/db/schema';
 import { cents, type Cents, type Condition } from '@pcs/shared';
 import {
   SERVICE_TIERS, rollGrade, gradedValue, mulberry32, computePrice,
@@ -48,6 +48,61 @@ export interface SubmissionView {
   rawValue: Cents;
 }
 
+/** A physical copy that has never received a grade and may be submitted. */
+export interface GradeableCard {
+  inventoryId: string;
+  name: string;
+  number: string;
+  imageSmall: string | null;
+  marketBasePrice: Cents | null;
+  rarityTier: string;
+  setName: string;
+}
+
+/**
+ * Query candidates by inventory ID, not card metadata. Two copies of the same
+ * Charizard remain distinct: a grade on one copy never disqualifies the other.
+ */
+export async function findGradeableCards(db: Database, userId: string): Promise<GradeableCard[]> {
+  const rows = await db
+    .select({
+      inventoryId: inventoryItems.id,
+      name: cards.name,
+      number: cards.number,
+      imageSmall: cards.imageSmall,
+      marketBasePrice: cards.marketBasePrice,
+      rarityTier: cards.rarityTier,
+      setName: sets.name,
+    })
+    .from(inventoryItems)
+    .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
+    .leftJoin(sets, eq(sets.id, cards.setId))
+    .where(and(
+      eq(inventoryItems.userId, userId),
+      eq(inventoryItems.status, 'owned'),
+      notExists(
+        db.select({ id: grades.id })
+          .from(grades)
+          .where(eq(grades.inventoryItemId, inventoryItems.id)),
+      ),
+    ))
+    .orderBy(desc(inventoryItems.acquiredAt));
+
+  return rows.map((row) => ({
+    inventoryId: row.inventoryId,
+    name: row.name ?? '',
+    number: row.number ?? '',
+    imageSmall: row.imageSmall,
+    marketBasePrice: row.marketBasePrice === null ? null : cents(row.marketBasePrice),
+    rarityTier: row.rarityTier ?? 'common',
+    setName: row.setName ?? '',
+  }));
+}
+
+export async function listGradeableCards(userId: string): Promise<GradeableCard[]> {
+  return findGradeableCards(await getDb(), userId);
+}
+
 export async function submitForGrading(
   userId: string,
   inventoryId: string,
@@ -91,14 +146,19 @@ export async function submitForGradingBulk(
       condition: inventoryItems.condition,
       cardName: cards.name,
       basePrice: cards.marketBasePrice,
+      existingGradeId: grades.id,
     })
     .from(inventoryItems)
     .leftJoin(cards, eq(cards.id, inventoryItems.cardId))
+    .leftJoin(grades, eq(grades.inventoryItemId, inventoryItems.id))
     .where(and(eq(inventoryItems.userId, userId), inArray(inventoryItems.id, ids)));
 
   if (items.length !== ids.length) throw new GameError('You do not own every selected card', 'not_owned');
   for (const it of items) {
     if (it.status !== 'owned') throw new GameError(`Card ${it.cardName ?? it.id} is not available`, 'not_available');
+    if (it.existingGradeId) {
+      throw new GameError(`Card ${it.cardName ?? it.id} has already been graded`, 'already_graded');
+    }
     const condition = (it.condition ?? 'near_mint') as Condition;
     const rawValue = computePrice(cents(it.basePrice ?? 0), { condition });
     if (rawValue > tier.maxDeclaredValue) {

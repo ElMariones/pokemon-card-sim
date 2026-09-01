@@ -43,12 +43,12 @@ export default function GradingPage() {
   const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
-    const [g, c] = await Promise.all([
-      fetch("/api/grading").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/collection?pageSize=100").then((r) => (r.ok ? r.json() : null)),
-    ]);
-    if (g) { setSubmissions(g.submissions ?? []); setTiers(g.tiers ?? []); }
-    if (c) setOwned(c.items ?? []);
+    const g = await fetch("/api/grading").then((r) => (r.ok ? r.json() : null));
+    if (g) {
+      setSubmissions(g.submissions ?? []);
+      setTiers(g.tiers ?? []);
+      setOwned(g.candidates ?? []);
+    }
   }, []);
 
   useEffect(() => {
@@ -89,7 +89,8 @@ export default function GradingPage() {
 
   const filteredOwned = useMemo(() => {
     const term = q.trim().toLowerCase();
-    let list = [...owned].sort((a, b) => (b.marketBasePrice ?? 0) - (a.marketBasePrice ?? 0));
+    let list = [...owned]
+      .sort((a, b) => (b.marketBasePrice ?? 0) - (a.marketBasePrice ?? 0));
     if (term) list = list.filter((c) => c.name.toLowerCase().includes(term) || c.number.toLowerCase().includes(term));
     return list.slice(0, 60);
   }, [owned, q]);
@@ -147,7 +148,7 @@ export default function GradingPage() {
           <div className="pane p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="t-eyebrow text-manila-3">
-                {n === 0 ? "Choose up to 20 cards to submit" : `${n} / 20 selected`}
+                {n === 0 ? "Choose up to 20 ungraded cards to submit" : `${n} / 20 selected`}
               </p>
               <div className="flex items-center gap-2">
                 <input
@@ -166,44 +167,50 @@ export default function GradingPage() {
 
             {owned.length === 0 ? (
               <p className="text-manila-3 text-sm">
-                Nothing to grade yet. <Link href="/" scroll={false} className="text-brass underline">Open a pack.</Link>
+                No ungraded cards are available. Graded copies cannot be submitted again. <Link href="/" scroll={false} className="text-brass underline">Open a pack.</Link>
               </p>
             ) : (
               <>
-                <ul className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-10">
-                  {filteredOwned.map((c) => {
-                    const selected = pickedIds.has(c.inventoryId);
-                    return (
-                      <li key={c.inventoryId}>
-                        <button
-                          type="button"
-                          onClick={() => toggle(c)}
-                          aria-pressed={selected}
-                          className={cn(
-                            "group w-full text-left focus-visible:outline-2 focus-visible:outline-brass rounded-[8px] ring-1 transition",
-                            selected ? "ring-brass bg-vitrine-3" : "ring-seam hover:ring-brass",
-                          )}
-                        >
-                          <div className="relative aspect-[2.5/3.5] overflow-hidden rounded-[8px]">
-                            {c.imageSmall && (
-                              <Image src={c.imageSmall} alt="" fill sizes="110px" unoptimized className="object-cover" />
+                {filteredOwned.length === 0 ? (
+                  <p className="text-manila-3 py-4 text-sm">
+                    No ungraded cards match that filter.
+                  </p>
+                ) : (
+                  <ul className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-10">
+                    {filteredOwned.map((c) => {
+                      const selected = pickedIds.has(c.inventoryId);
+                      return (
+                        <li key={c.inventoryId}>
+                          <button
+                            type="button"
+                            onClick={() => toggle(c)}
+                            aria-pressed={selected}
+                            className={cn(
+                              "group w-full text-left focus-visible:outline-2 focus-visible:outline-brass rounded-[8px] ring-1 transition",
+                              selected ? "ring-brass bg-vitrine-3" : "ring-seam hover:ring-brass",
                             )}
-                            {selected && (
-                              <span className="bg-brass text-ink absolute top-1.5 right-1.5 grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold">✓</span>
-                            )}
-                            {picked.length >= 20 && !selected && (
-                              <span className="bg-ink/60 absolute inset-0 grid place-items-center text-[10px] tracking-wide uppercase text-white">Full</span>
-                            )}
-                          </div>
-                          <p className="text-manila-2 mt-1 truncate px-1 text-[11px]">{c.name}</p>
-                          <p className="t-num text-manila-3 truncate px-1 pb-1 text-[11px] tabular-nums">
-                            {money((c.marketBasePrice ?? 0) as Cents)}
-                          </p>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                          >
+                            <div className="relative aspect-[2.5/3.5] overflow-hidden rounded-[8px]">
+                              {c.imageSmall && (
+                                <Image src={c.imageSmall} alt="" fill sizes="110px" unoptimized className="object-cover" />
+                              )}
+                              {selected && (
+                                <span className="bg-brass text-ink absolute top-1.5 right-1.5 grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold">✓</span>
+                              )}
+                              {picked.length >= 20 && !selected && (
+                                <span className="bg-ink/60 absolute inset-0 grid place-items-center text-[10px] tracking-wide uppercase text-white">Full</span>
+                              )}
+                            </div>
+                            <p className="text-manila-2 mt-1 truncate px-1 text-[11px]">{c.name}</p>
+                            <p className="t-num text-manila-3 truncate px-1 pb-1 text-[11px] tabular-nums">
+                              {money((c.marketBasePrice ?? 0) as Cents)}
+                            </p>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
 
                 {n > 0 && (
                   <div className="border-seam mt-6 border-t pt-5">

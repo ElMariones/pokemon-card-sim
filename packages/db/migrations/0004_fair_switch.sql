@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "grades_inventory_item_uq" ON "grades" USING btree ("inventory_item_id");
