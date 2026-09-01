@@ -134,8 +134,10 @@ export function CardTile({
             Reverse
           </span>
         )}
-        {isNew && <NewCardSticker />}
       </div>
+      {/* The image layer clips card art and foil. The album seal belongs above
+          that layer so its points remain fully visible at the card edge. */}
+      {isNew && <NewCardSticker />}
 
       <div className="mt-2 flex items-start gap-1.5">
         <RaritySymbol tier={rarityTier} className="mt-0.5 h-3 w-3 text-manila-2" />

@@ -142,11 +142,18 @@ function FlipCard({
       // The swap is driven by the rotation itself rather than a timer set to
       // half the duration. A timer drifts from the animation — it fired on
       // schedule while the rotation was still near 180, so the front appeared
-      // mirrored. Reading the angle is exact and self-correcting.
+      // mirrored. Once a card has crossed the halfway point, its front stays
+      // latched until that card leaves the deck. Motion can emit a late frame
+      // around 180° as the next card enters; toggling back there remounted the
+      // NEW seal and made it flash a second time.
       onUpdate={(latest) => {
         const deg = Math.abs(Number(latest.rotateY) % 360);
         const front = revealed && (deg < 90 || deg > 270);
-        setShowFront((prev) => (prev === front ? prev : front));
+        if (!revealed) {
+          setShowFront(false);
+        } else if (front) {
+          setShowFront(true);
+        }
       }}
     >
       <span className={CARD_SURFACE} style={{ opacity: showFront ? 1 : 0 }}>
