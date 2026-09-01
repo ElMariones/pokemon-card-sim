@@ -36,9 +36,11 @@ const excluded = (c: string) => sql.raw(`excluded.${c}`);
 async function fetchSetPrices(setId: string): Promise<ApiCard[]> {
   const out: ApiCard[] = [];
   for (let page = 1; ; page++) {
+    // Nested price fields are omitted by the API when its `select` projection
+    // requests `tcgplayer`/`cardmarket`; fetch full records to retain them.
     const url =
       `https://api.pokemontcg.io/v2/cards?q=set.id:${encodeURIComponent(setId)}` +
-      `&pageSize=${PAGE_SIZE}&page=${page}&select=id,tcgplayer,cardmarket`;
+      `&pageSize=${PAGE_SIZE}&page=${page}`;
     // The upstream API returns intermittent 500/502s that clear on retry, so
     // this is deliberately more patient than the catalogue fetches.
     const res = await fetchJson<ApiPage>(url, { retries: 8, baseDelayMs: 1500 });

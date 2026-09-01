@@ -9,7 +9,9 @@
  *
  * Simulating the actual engine removes the approximation entirely. The result
  * is cached in pack_templates.simulatorPrice so the shop reads a number rather
- * than running 20,000 openings per request.
+ * than running 20,000 openings per request. A verified sealed-market snapshot
+ * can replace that fallback via data:market-packs; those values deliberately
+ * survive subsequent simulations.
  *
  *   npx tsx scripts/simulate/price-packs.ts --n=20000
  */
@@ -20,7 +22,7 @@ import {
   openPack, deriveTemplate, isReverseEligible, createSeed,
 } from '../../packages/pack-engine/src/index';
 import type { EngineCard } from '../../packages/pack-engine/src/types';
-import { formatCents, cents, type RarityTier } from '../../packages/shared/src/index';
+import { formatCents, cents, type Cents, type RarityTier } from '../../packages/shared/src/index';
 import { derivePackPrice } from '../../packages/economy-engine/src/pricing';
 import { parseArgs, runScript } from '../import/http';
 
@@ -74,7 +76,15 @@ async function main() {
 
     const measured = cents(Math.round(total / n));
     const price = derivePackPrice(measured);
-    const ret = price === 0 ? 0 : measured / price;
+    const existing = (await db
+      .select({ simulatorPrice: packTemplates.simulatorPrice, source: packTemplates.source })
+      .from(packTemplates)
+      .where(eq(packTemplates.id, template.id)))[0];
+    const marketTemplate = existing?.source.startsWith('market-median:') ? existing : null;
+    const hasMarketPrice = marketTemplate !== null;
+    const effectivePrice: Cents = marketTemplate ? cents(marketTemplate.simulatorPrice) : price;
+    const effectiveSource = marketTemplate ? marketTemplate.source : template.source;
+    const ret = effectivePrice === 0 ? 0 : measured / effectivePrice;
     if (ret > worst) { worst = ret; worstSet = set.id; }
 
     await db
@@ -82,15 +92,17 @@ async function main() {
       .values({
         id: template.id, setId: set.id, name: template.name,
         productType: template.productType, cardsPerPack: template.cardsPerPack,
-        slots: template.slots, simulatorPrice: price,
-        confidence: template.confidence, source: template.source, version: template.version,
+        slots: template.slots, simulatorPrice: effectivePrice,
+        confidence: hasMarketPrice ? 'estimated' : template.confidence,
+        source: effectiveSource, version: template.version,
       })
       .onConflictDoUpdate({
         target: packTemplates.id,
         set: {
-          simulatorPrice: price, slots: template.slots,
-          cardsPerPack: template.cardsPerPack, confidence: template.confidence,
-          source: template.source, version: template.version,
+          simulatorPrice: effectivePrice, slots: template.slots,
+          cardsPerPack: template.cardsPerPack,
+          confidence: hasMarketPrice ? 'estimated' : template.confidence,
+          source: effectiveSource, version: template.version,
         },
       });
 
@@ -112,7 +124,7 @@ async function main() {
     }
 
     console.log(
-      `  ${set.id.padEnd(12)} price ${formatCents(price).padStart(9)}` +
+      `  ${set.id.padEnd(12)} price ${formatCents(effectivePrice).padStart(9)}` +
         `  contents ${formatCents(measured).padStart(9)}  return ${(ret * 100).toFixed(1)}%`,
     );
   }

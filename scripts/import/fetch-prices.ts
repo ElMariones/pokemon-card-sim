@@ -34,9 +34,13 @@ const exists = (p: string) => access(p).then(() => true, () => false);
 async function fetchSet(setId: string): Promise<unknown[]> {
   const out: unknown[] = [];
   for (let page = 1; ; page++) {
+    // Do not use the API's `select` parameter here. Its current projection of
+    // `tcgplayer`/`cardmarket` keeps only each URL and silently drops the
+    // nested `prices` block, leaving every card unpriced. Full records are
+    // larger, but price data is the sole reason this importer exists.
     const url =
       `https://api.pokemontcg.io/v2/cards?q=set.id:${encodeURIComponent(setId)}` +
-      `&pageSize=${PAGE_SIZE}&page=${page}&select=id,tcgplayer,cardmarket`;
+      `&pageSize=${PAGE_SIZE}&page=${page}`;
     const res = await fetchJson<ApiPage>(url, { retries: 8, baseDelayMs: 1500 });
     out.push(...(res.data ?? []));
     if (!res.data?.length || out.length >= (res.totalCount ?? 0)) break;
