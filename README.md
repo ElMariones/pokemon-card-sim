@@ -12,9 +12,42 @@ The project is deliberately built as a game system, not a card gallery. Pack pul
 
 The pack browser presents a broad catalogue without losing the feeling of browsing a display case: search and era filters narrow the sets, while each item carries its own wrapper treatment, card count, pack size, and simulator price.
 
-![Empty collection state with searchable filters and sorting controls](docs/screenshots/collection.jpg)
+![Populated PokeCard collection design showcase with filters, sorting controls, a new-card marker, and cards from the recorded opening](docs/screenshots/collection-populated-showcase.png)
 
-The collection is designed as an album workspace rather than a raw inventory dump. Its filters, quick views, and sorting stay useful from the first pull through duplicate management, grading, and set completion.
+The collection is designed as an album workspace rather than a raw inventory dump. This visual showcase uses the real interface as its layout reference and the sampled 151 pull below as its content direction, illustrating how the filters, quick views, and sorting stay useful from the first pull through duplicate management, grading, and set completion.
+
+### A seeded opening, recorded
+
+The browser does not decide a pull. It asks the server to open a selected set; the server checks the balance, applies the pack price, derives the set template, draws the cards from a private seed, and writes the inventory, opening record, XP, and ledger entry before returning the reveal.
+
+```text
+Choose a set
+    -> validate player and charge pack
+    -> versioned template + private seed
+    -> slot-by-slot card selection
+    -> reveal result + inventory copies + XP + transaction audit trail
+```
+
+The following is a real deterministic run of the 151 template (`sv3pt5-booster` v1, seed `readme-hit-9`). It shows the same inventory records a collection view receives after a reveal—four commons, three uncommons, a reverse, a hit, and energy. The secret-rare Venusaur ex is not a scripted reward; it is the selected hit slot for that seed.
+
+| Slot | Pulled card | Tier | Simulator value |
+| --- | --- | --- | ---: |
+| Common 1 | Antique Old Amber #154 | Common | $0.22 |
+| Common 2 | Magikarp #129 | Common | $0.20 |
+| Common 3 | Kakuna #14 | Common | $0.21 |
+| Common 4 | Weepinbell #70 | Common | $0.20 |
+| Uncommon 1 | Onix #95 | Uncommon | $0.19 |
+| Uncommon 2 | Leftovers #163 | Uncommon | $0.23 |
+| Uncommon 3 | Persian #53 | Uncommon | $0.18 |
+| Reverse | Antique Dome Fossil #152 | Common · reverse holo | $0.20 |
+| Hit | Venusaur ex #198 | Secret rare | $114.71 |
+| Energy | Basic Psychic Energy #207 | Energy | $4.53 |
+
+<p align="center">
+  <img src="docs/screenshots/opening-hit-venusaur.png" alt="Venusaur ex, the secret-rare hit from the recorded 151 opening" width="260" />
+</p>
+
+Three additional seeded runs completed successfully before this showcase pull, producing Chansey, Omastar, and Nidoking as the respective rare hit-slot cards. This gives the README a repeatable, data-backed example rather than a hand-authored “lucky pull.”
 
 ## What you can do
 
