@@ -23,7 +23,7 @@ export function NewCardSticker({ className, size = "tile" }: NewCardStickerProps
   const reduceMotion = useReducedMotion();
 
   return (
-    <motion.span
+    <span
       className={cn(
         "new-card-sticker pointer-events-none absolute z-20 grid place-items-center",
         size === "reveal"
@@ -31,18 +31,6 @@ export function NewCardSticker({ className, size = "tile" }: NewCardStickerProps
           : "new-card-sticker--tile -right-3 -top-3 h-14 w-14 sm:h-[4.5rem] sm:w-[4.5rem]",
         className,
       )}
-      initial={reduceMotion ? false : { opacity: 0, scale: 0.55, rotate: -18, y: -8 }}
-      animate={
-        reduceMotion
-          ? undefined
-          : {
-              opacity: 1,
-              scale: [0.55, 1.13, 0.97, 1],
-              rotate: [-18, 5, -2, 0],
-              y: [-8, 0, -1, 0],
-            }
-      }
-      transition={{ duration: 0.55, times: [0, 0.54, 0.8, 1], ease: [0.22, 1, 0.36, 1] }}
       aria-label="New to your album"
     >
       <span className="new-card-sticker__glow absolute inset-[11%] rounded-full" aria-hidden />
@@ -62,6 +50,6 @@ export function NewCardSticker({ className, size = "tile" }: NewCardStickerProps
         </g>
       </motion.svg>
       <span className="new-card-sticker__word absolute inset-0 grid place-items-center">NEW!</span>
-    </motion.span>
+    </span>
   );
 }
