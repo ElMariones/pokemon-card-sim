@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { usePlayer } from "@/components/PlayerProvider";
@@ -25,23 +24,22 @@ export default function SealedPage() {
   usePreservedScroll();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [cash, setCash] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [opened, setOpened] = useState<{ label: string; totalValue: number; paid: number; cards: number } | null>(null);
   const [setFilter, setSetFilter] = useQueryState("set", "");
 
-  // Use header cash for affordability, but keep local cash in sync for fallback
-  const effectiveCash = player?.cash ?? cash;
+  const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
-    const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null));
-    if (me) setCash(me.player?.cash ?? null);
     const s = await fetch("/api/sealed").then((r) => (r.ok ? r.json() : null));
     if (s) { setOffers(s.offers ?? []); setHoldings(s.holdings ?? []); }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   const post = async (path: string, body: object) => {
     setBusy(true); setError(null);

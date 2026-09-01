@@ -67,7 +67,10 @@ export function CardDetail({
     if (res.ok) setData(await res.json());
   }, [cardId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   // Escape closes; focus moves into the dialog so the keyboard is not stranded
   // behind it, and the page underneath cannot be scrolled while it is open.

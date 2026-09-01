@@ -53,7 +53,10 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
     setLoading(false);
   }, [setId, filter]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   // Search is client-side because the binder for one set is at most a few
   // hundred rows and already in memory. The catalogue-wide search is server-side.

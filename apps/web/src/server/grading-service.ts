@@ -146,6 +146,7 @@ export async function submitForGradingBulk(
   const cardsOut: { inventoryId: string; cardName: string; grade: import('@pcs/economy-engine').GradeResult }[] = [];
   let gemCount = 0;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.transaction(async (tx: any) => {
     for (const it of items) {
       const condition = (it.condition ?? 'near_mint') as Condition;
@@ -280,6 +281,7 @@ export async function collectGrade(userId: string, gradeId: string) {
     throw new GameError('That card is still being graded', 'not_ready');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.transaction(async (tx: any) => {
     await tx
       .update(grades)

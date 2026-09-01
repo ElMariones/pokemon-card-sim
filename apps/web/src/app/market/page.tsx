@@ -63,7 +63,10 @@ export default function MarketPage() {
     setLoading(false);
   }, [refresh]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   // Buyers arrive on a timer, so the stall checks itself while it is open.
   useEffect(() => {

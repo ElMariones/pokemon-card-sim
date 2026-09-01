@@ -37,24 +37,24 @@ export default function GradingPage() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [owned, setOwned] = useState<OwnedCard[]>([]);
   const [picked, setPicked] = useState<OwnedCard[]>([]);
-  const [cash, setCash] = useState<number | null>(null);
   const [q, setQ] = useQueryState("q", "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const effectiveCash = player?.cash ?? cash;
+  const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
-    const [g, c, me] = await Promise.all([
+    const [g, c] = await Promise.all([
       fetch("/api/grading").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/collection?pageSize=100").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/me").then((r) => (r.ok ? r.json() : null)),
     ]);
     if (g) { setSubmissions(g.submissions ?? []); setTiers(g.tiers ?? []); }
     if (c) setOwned(c.items ?? []);
-    if (me) setCash(me.player?.cash ?? null);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   // Tick the countdowns locally, and refetch when one finishes so the grade
   // is revealed by the server rather than guessed at by the client.

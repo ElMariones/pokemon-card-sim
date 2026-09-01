@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
  * Keep a query param in sync with state without adding history entries
@@ -9,7 +9,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
  * survive navigation.
  */
 export function useQueryState(key: string, defaultValue: string) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -27,12 +26,13 @@ export function useQueryState(key: string, defaultValue: string) {
       else params.set(key, next);
       const qs = params.toString();
       const url = qs ? `${pathname}?${qs}` : pathname;
-      // Sync window.history immediately so the next setter in this tick reads the
-      // updated query, then let Next's router catch up without scrolling.
+      // Next observes native history updates in the App Router. Calling
+      // router.replace as well starts a second navigation for every filter
+      // change (and every keystroke in a search box), which was the largest
+      // source of UI jank in otherwise client-only pages.
       if (typeof window !== "undefined") window.history.replaceState(null, "", url);
-      router.replace(url, { scroll: false });
     },
-    [key, defaultValue, pathname, router, searchParams],
+    [key, defaultValue, pathname, searchParams],
   );
 
   return [value, setValue] as const;
@@ -50,14 +50,10 @@ export function useQueryState(key: string, defaultValue: string) {
 export function usePreservedScroll() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const keyRef = useRef<string>("");
-
   const fullKey = `${pathname}?${searchParams.toString()}`;
-  // keep ref in sync for scroll handler closure
-  keyRef.current = `scroll:${fullKey}`;
+  const key = `scroll:${fullKey}`;
 
   useEffect(() => {
-    const key = keyRef.current;
     const saved = sessionStorage.getItem(key);
     if (saved != null) {
       const y = parseInt(saved, 10);
@@ -66,7 +62,6 @@ export function usePreservedScroll() {
     } else {
       // fresh URL — only scroll to top on push, not on pop. pop will have saved.
       // If there's no saved entry, this is a fresh visit; start at top.
-      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
       // Avoid scrolling to top when this mount is due to a back/forward pop that
       // simply had no prior save (e.g. direct reload). In that case leave as is.
       // Heuristic: if we just popped, sessionStorage would have an entry; absence
@@ -76,7 +71,7 @@ export function usePreservedScroll() {
 
     let ticking = false;
     const save = () => {
-      sessionStorage.setItem(keyRef.current, String(window.scrollY));
+      sessionStorage.setItem(key, String(window.scrollY));
     };
     const onScroll = () => {
       if (ticking) return;
@@ -98,5 +93,5 @@ export function usePreservedScroll() {
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("beforeunload", onPageHide);
     };
-  }, [fullKey]);
+  }, [key]);
 }

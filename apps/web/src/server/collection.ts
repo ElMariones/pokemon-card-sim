@@ -43,59 +43,59 @@ export async function getSetCompletion(
 ): Promise<SetCompletion | null> {
   const db = await getDb();
 
-  const [set] = await db
-    .select({ id: sets.id, name: sets.name })
-    .from(sets)
-    .where(eq(sets.id, setId))
-    .limit(1);
+  // The old implementation issued five serial aggregates before the binder
+  // could start. These three independent queries retain the exact semantics
+  // while letting the database work overlap.
+  const [setRows, ownedRows, rarityRows] = await Promise.all([
+    db
+      .select({
+        id: sets.id,
+        name: sets.name,
+        totalCards: sql<number>`count(${cards.id})::int`,
+        setValue: sql<number>`coalesce(sum(${cards.marketBasePrice}), 0)::int`,
+      })
+      .from(sets)
+      .leftJoin(cards, eq(cards.setId, sets.id))
+      .where(eq(sets.id, setId))
+      .groupBy(sets.id),
+    db
+      .select({
+        ownedCards: sql<number>`count(distinct ${inventoryItems.cardId})::int`,
+        ownedCopies: sql<number>`count(*)::int`,
+        ownedValue: sql<number>`coalesce(sum(${cards.marketBasePrice}), 0)::int`,
+      })
+      .from(inventoryItems)
+      .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
+      .where(
+        and(
+          eq(inventoryItems.userId, userId),
+          eq(inventoryItems.status, 'owned'),
+          eq(cards.setId, setId),
+        ),
+      ),
+    db
+      .select({
+        tier: cards.rarityTier,
+        total: sql<number>`count(distinct ${cards.id})::int`,
+        owned: sql<number>`count(distinct ${inventoryItems.cardId})::int`,
+      })
+      .from(cards)
+      .leftJoin(
+        inventoryItems,
+        and(
+          eq(inventoryItems.cardId, cards.id),
+          eq(inventoryItems.userId, userId),
+          eq(inventoryItems.status, 'owned'),
+        ),
+      )
+      .where(eq(cards.setId, setId))
+      .groupBy(cards.rarityTier),
+  ]);
+  const set = setRows[0];
   if (!set) return null;
+  const owned = ownedRows[0];
 
-  const [totals] = await db
-    .select({
-      totalCards: sql<number>`count(*)::int`,
-      setValue: sql<number>`coalesce(sum(${cards.marketBasePrice}), 0)::int`,
-    })
-    .from(cards)
-    .where(eq(cards.setId, setId));
-
-  const [owned] = await db
-    .select({
-      ownedCards: sql<number>`count(distinct ${cards.id})::int`,
-      ownedCopies: sql<number>`count(*)::int`,
-      ownedValue: sql<number>`coalesce(sum(${cards.marketBasePrice}), 0)::int`,
-    })
-    .from(inventoryItems)
-    .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
-    .where(
-      and(
-        eq(inventoryItems.userId, userId),
-        eq(inventoryItems.status, 'owned'),
-        eq(cards.setId, setId),
-      ),
-    );
-
-  const rarityTotals = await db
-    .select({ tier: cards.rarityTier, n: sql<number>`count(*)::int` })
-    .from(cards)
-    .where(eq(cards.setId, setId))
-    .groupBy(cards.rarityTier);
-
-  const rarityOwned = await db
-    .select({ tier: cards.rarityTier, n: sql<number>`count(distinct ${cards.id})::int` })
-    .from(inventoryItems)
-    .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
-    .where(
-      and(
-        eq(inventoryItems.userId, userId),
-        eq(inventoryItems.status, 'owned'),
-        eq(cards.setId, setId),
-      ),
-    )
-    .groupBy(cards.rarityTier);
-
-  const ownedByTier = new Map(rarityOwned.map((r) => [r.tier, Number(r.n)]));
-
-  const totalCards = Number(totals?.totalCards ?? 0);
+  const totalCards = Number(set.totalCards ?? 0);
   const ownedCards = Number(owned?.ownedCards ?? 0);
   const ownedCopies = Number(owned?.ownedCopies ?? 0);
 
@@ -107,13 +107,13 @@ export async function getSetCompletion(
     ownedCopies,
     duplicates: Math.max(0, ownedCopies - ownedCards),
     completionBp: bpOf(ownedCards, totalCards),
-    estimatedSetValue: cents(Number(totals?.setValue ?? 0)),
+    estimatedSetValue: cents(Number(set.setValue ?? 0)),
     ownedValue: cents(Number(owned?.ownedValue ?? 0)),
-    byRarity: rarityTotals
+    byRarity: rarityRows
       .map((r) => ({
         rarityTier: r.tier as RarityTier,
-        total: Number(r.n),
-        owned: ownedByTier.get(r.tier) ?? 0,
+        total: Number(r.total),
+        owned: Number(r.owned),
       }))
       .sort((a, b) => b.total - a.total),
   };

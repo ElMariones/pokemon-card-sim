@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
-import { LevelBadge } from "@/components/LevelBadge";
 import { usePlayer } from "@/components/PlayerProvider";
 import { usePreservedScroll } from "@/lib/nav-state";
 import type { Cents } from "@pcs/shared";
@@ -30,19 +28,17 @@ export default function MissionsPage() {
   const { refresh, setCash: setHeaderCash } = usePlayer();
   usePreservedScroll();
   const [prog, setProg] = useState<Progression | null>(null);
-  const [cash, setCash] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [p, me] = await Promise.all([
-      fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/me").then((r) => (r.ok ? r.json() : null)),
-    ]);
+    const p = await fetch("/api/progression").then((r) => (r.ok ? r.json() : null));
     if (p) setProg(p);
-    if (me) setCash(me.player?.cash ?? null);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   const claim = async (missionId: string) => {
     setError(null);

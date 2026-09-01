@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { PackOpening, type OpeningView } from "@/components/PackOpening";
@@ -18,6 +17,25 @@ interface SetRow {
   logoUrl: string | null; symbolUrl: string | null; openable: boolean;
 }
 
+const SETS_CACHE_MS = 5 * 60_000;
+let cachedSets: { value: SetRow[]; expiresAt: number } | null = null;
+let setsRequest: Promise<SetRow[]> | null = null;
+
+function loadOpenableSets(): Promise<SetRow[]> {
+  if (cachedSets && cachedSets.expiresAt > Date.now()) return Promise.resolve(cachedSets.value);
+  if (setsRequest) return setsRequest;
+
+  setsRequest = fetch("/api/sets?limit=200")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      const value = (data?.sets ?? []).filter((set: SetRow) => set.openable) as SetRow[];
+      cachedSets = { value, expiresAt: Date.now() + SETS_CACHE_MS };
+      return value;
+    })
+    .finally(() => { setsRequest = null; });
+  return setsRequest;
+}
+
 export default function PacksPage() {
   const { player, setCash, refresh } = usePlayer();
   const [sets, setSets] = useState<SetRow[]>([]);
@@ -29,10 +47,9 @@ export default function PacksPage() {
   usePreservedScroll();
 
   useEffect(() => {
-    (async () => {
-      const s = await fetch("/api/sets?limit=200").then((r) => (r.ok ? r.json() : null));
-      if (s) setSets((s.sets ?? []).filter((x: SetRow) => x.openable));
-    })();
+    let mounted = true;
+    void loadOpenableSets().then((sets) => { if (mounted) setSets(sets); });
+    return () => { mounted = false; };
   }, []);
 
   const visible = useMemo(() => {

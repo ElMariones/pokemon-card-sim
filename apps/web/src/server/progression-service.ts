@@ -1,8 +1,7 @@
-import { and, eq, gte, sql, inArray } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
 import { randomUUID } from 'node:crypto';
 import { users, openings, transactions, inventoryItems, cards, grades, missions as missionsTable } from '@pcs/db/schema';
-import { cents, type Cents } from '@pcs/shared';
 import {
   awardXp, levelForXp, nextLevel, levelProgressBp, unlockedFeatures,
   MISSION_TEMPLATES, missionsFor, windowEnd,
@@ -176,11 +175,30 @@ export async function getProgression(userId: string): Promise<ProgressionView> {
  * and the XP getting out of step.
  */
 export async function grantXp(userId: string, reason: XpReason, count = 1) {
+  return grantXpMany(userId, [{ reason, count }]);
+}
+
+/** Apply several awards with one read/write pair after a compound game action. */
+export async function grantXpMany(
+  userId: string,
+  awards: readonly { reason: XpReason; count: number }[],
+) {
   const db = await getDb();
   const [user] = await db.select({ xp: users.xp }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
 
-  const result = awardXp(user.xp, reason, count);
+  let xp = user.xp;
+  for (const { reason, count } of awards) {
+    if (count > 0) xp = awardXp(xp, reason, count).totalXp;
+  }
+  const result = {
+    xpGained: xp - user.xp,
+    totalXp: xp,
+    previousLevel: levelForXp(user.xp).level,
+    newLevel: levelForXp(xp).level,
+    leveledUp: levelForXp(xp).level > levelForXp(user.xp).level,
+    newUnlocks: [...unlockedFeatures(xp)].filter((unlock) => !unlockedFeatures(user.xp).has(unlock)),
+  };
   await db
     .update(users)
     .set({ xp: result.totalXp, level: result.newLevel, lastSeenAt: new Date() })

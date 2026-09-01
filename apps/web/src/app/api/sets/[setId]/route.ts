@@ -14,21 +14,16 @@ export async function GET(
   const player = (await requirePlayer()) ?? (await getOrCreatePlayer());
   const url = new URL(request.url);
 
-  const completion = await getSetCompletion(player.id, setId);
+  const [completion, binder, packPrice] = await Promise.all([
+    getSetCompletion(player.id, setId),
+    getBinder(player.id, setId, {
+      ownedOnly: url.searchParams.get('filter') === 'owned',
+      missingOnly: url.searchParams.get('filter') === 'missing',
+      rarityTier: url.searchParams.get('rarity') ?? undefined,
+    }),
+    getPackPrice(setId).catch(() => null),
+  ]);
   if (!completion) return NextResponse.json({ error: 'No such set' }, { status: 404 });
-
-  const binder = await getBinder(player.id, setId, {
-    ownedOnly: url.searchParams.get('filter') === 'owned',
-    missingOnly: url.searchParams.get('filter') === 'missing',
-    rarityTier: url.searchParams.get('rarity') ?? undefined,
-  });
-
-  let packPrice: number | null = null;
-  try {
-    packPrice = await getPackPrice(setId);
-  } catch {
-    // A set with no priced cards cannot be sold as a pack. Not an error.
-  }
 
   return NextResponse.json({ completion, binder, packPrice });
 }

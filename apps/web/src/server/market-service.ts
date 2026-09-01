@@ -161,6 +161,7 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
     const price = cents(l.askPrice);
     const { fee, net } = netProceeds(price);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.transaction(async (tx: any) => {
       await tx
         .update(listings)
@@ -346,6 +347,7 @@ export async function createListing(userId: string, inventoryItemId: string, ask
   const now = new Date();
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.transaction(async (tx: any) => {
       await tx.insert(listings).values({
         id,
@@ -365,10 +367,11 @@ export async function createListing(userId: string, inventoryItemId: string, ask
         .set({ status: 'listed' })
         .where(eq(inventoryItems.id, inventoryItemId));
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Race: two concurrent list requests both passed the check above; the
     // partial unique index rejects the loser. Surface as a friendly error.
-    const isUniqueViolation = err?.code === '23505' || String(err?.message ?? '').includes('listings_item_uq');
+    const databaseError = err as { code?: string; message?: string };
+    const isUniqueViolation = databaseError.code === '23505' || String(databaseError.message ?? '').includes('listings_item_uq');
     if (isUniqueViolation) throw new GameError('That card is already listed', 'already_listed');
     throw err;
   }
@@ -387,6 +390,7 @@ export async function cancelListing(userId: string, listingId: string) {
   if (!l) throw new GameError('No such listing', 'not_found');
   if (l.status !== 'active') throw new GameError('That listing is no longer active', 'not_active');
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.transaction(async (tx: any) => {
     await tx.update(listings).set({ status: 'cancelled' }).where(eq(listings.id, listingId));
     await tx

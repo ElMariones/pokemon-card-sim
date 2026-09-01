@@ -100,8 +100,15 @@ export default function CollectionPage() {
     if (res.ok) setFacets(await res.json());
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadFacets(); }, [loadFacets]);
+  useEffect(() => {
+    // External fetch resolution, not a synchronous derived-state update.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadFacets();
+  }, [loadFacets]);
 
   const toggleFavorite = async (item: Item) => {
     // Optimistic: the star should respond instantly.

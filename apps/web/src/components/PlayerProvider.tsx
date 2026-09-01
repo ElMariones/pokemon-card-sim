@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import type { Cents } from "@pcs/shared";
 
@@ -49,26 +49,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [progression, setProgression] = useState<Progression | null>(null);
   const [collectionCount, setCollectionCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {
-    // /api/me establishes the session cookie and every other endpoint needs
-    // it, so it is awaited before the rest rather than raced against them.
-    const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null));
-    if (me?.player) setPlayer(me.player);
+    // Focus, visibility and mutation events can arrive together. Coalescing
+    // them avoids three copies of the shell's database work competing with a
+    // click that is trying to open a pack.
+    if (refreshInFlight.current) return refreshInFlight.current;
 
-    const [prog, stats] = await Promise.all([
-      fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/collection/stats").then((r) => (r.ok ? r.json() : null)),
-    ]);
-    if (prog) setProgression(prog);
-    if (stats) setCollectionCount(stats.totalCopies ?? 0);
-    setLoading(false);
+    const task = (async () => {
+      // /api/me establishes the session cookie and every other endpoint needs
+      // it, so it is awaited before the rest rather than raced against them.
+      const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null));
+      if (me?.player) setPlayer(me.player);
+
+      const [prog, stats] = await Promise.all([
+        fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/collection/stats").then((r) => (r.ok ? r.json() : null)),
+      ]);
+      if (prog) setProgression(prog);
+      if (stats) setCollectionCount(stats.totalCopies ?? 0);
+      setLoading(false);
+    })().finally(() => {
+      refreshInFlight.current = null;
+    });
+    refreshInFlight.current = task;
+    return task;
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  // Keep header cash fresh even if a page forgot to call refresh().
-  // Polling and focus refresh are cheap and paper over missed calls.
+  // Keep the shell fresh when returning to the tab. Mutations already call
+  // refresh explicitly; periodic polling made the PGlite-backed UI compete
+  // with navigation and pack-opening requests every fifteen seconds.
   useEffect(() => {
     const onFocus = () => { void refresh(); };
     const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
@@ -77,12 +90,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Custom event any mutating component can dispatch as a safety net
     const onCustom = () => { void refresh(); };
     window.addEventListener("pcs:refresh" as never, onCustom as never);
-    const id = setInterval(() => { void refresh(); }, 15000);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pcs:refresh" as never, onCustom as never);
-      clearInterval(id);
     };
   }, [refresh]);
 

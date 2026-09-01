@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
 import {
   sets, cards, openings, openingCards, inventoryItems, packTemplates, pullTables, grades,
@@ -13,7 +13,7 @@ import {
   applyTransaction, InsufficientFundsError, dealerBuyOffer, derivePackPrice,
   computePrice, rollPackCondition, mulberry32, gradedValue,
 } from '@pcs/economy-engine';
-import { grantXp } from './progression-service';
+import { grantXp, grantXpMany } from './progression-service';
 
 /**
  * The game service. Every economically meaningful decision happens here, on
@@ -96,22 +96,28 @@ async function expectedContentsValue(setId: string): Promise<Cents> {
  * an infinite money glitch.
  */
 export async function getPackPrice(setId: string): Promise<Cents> {
-  const db = await getDb();
+  const stored = await getStoredPackPrice(setId);
 
-  // Prefer the simulated price written by scripts/simulate/price-packs.ts. It
-  // is measured by running the real engine, so it accounts for the
-  // no-duplicate rule that the closed-form estimate cannot.
+  if (stored !== null) return stored;
+
+  // No cached price yet: fall back to the analytic estimate so a newly
+  // imported set is still playable before the pricing job has run.
+  return derivePackPrice(await expectedContentsValue(setId));
+}
+
+/**
+ * Price-pack import writes these rows ahead of time. Keeping this lookup
+ * separate lets the opening path avoid re-writing immutable template data for
+ * every purchase.
+ */
+async function getStoredPackPrice(setId: string): Promise<Cents | null> {
+  const db = await getDb();
   const [stored] = await db
     .select({ price: packTemplates.simulatorPrice })
     .from(packTemplates)
     .where(eq(packTemplates.id, `${setId}-booster`))
     .limit(1);
-
-  if (stored?.price && stored.price > 0) return cents(stored.price);
-
-  // No cached price yet: fall back to the analytic estimate so a newly
-  // imported set is still playable before the pricing job has run.
-  return derivePackPrice(await expectedContentsValue(setId));
+  return stored?.price && stored.price > 0 ? cents(stored.price) : null;
 }
 
 /** Exposed for the balance harness. */
@@ -218,8 +224,12 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
   const { set, engineCards, prices } = await loadEngineSet(setId);
   const { template, tables } = deriveTemplate(set, engineCards);
 
-  const cost = await getPackPrice(setId);
-  await ensureTemplatePersisted(template, tables, cost);
+  // Templates and their prices are imported once, not regenerated on every
+  // click. The fallback keeps a freshly imported catalogue playable before
+  // `data:price-packs` has run.
+  const storedPrice = await getStoredPackPrice(setId);
+  const cost = storedPrice ?? derivePackPrice(await expectedContentsValue(setId));
+  if (storedPrice === null) await ensureTemplatePersisted(template, tables, cost);
 
   // Charge first. If this throws, nothing else has happened yet.
   let balanceAfter: Cents;
@@ -246,39 +256,86 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
   const openingId = randomUUID();
   const rng = mulberry32(Math.floor(Math.random() * 2 ** 31));
 
-  const meta = new Map(
-    (
-      await db
+  const pulledIds = new Set(result.cards.map((c) => c.cardId));
+  const [metadataRows, ownedRows] = await Promise.all([
+    db
         .select({
           id: cards.id, name: cards.name, number: cards.number,
           imageSmall: cards.imageSmall, imageLarge: cards.imageLarge,
         })
         .from(cards)
-        .where(inArray(cards.id, result.cards.map((c) => c.cardId)))
-    ).map((r) => [r.id, r]),
-  );
+        .where(inArray(cards.id, [...pulledIds])),
+    // Which of these cards the player already had must be read before the
+    // pack is written. It is independent from the card metadata, so avoid a
+    // second serial database round-trip.
+    db
+      .select({ cardId: inventoryItems.cardId })
+      .from(inventoryItems)
+      .where(
+        and(
+          eq(inventoryItems.userId, userId),
+          inArray(inventoryItems.cardId, [...pulledIds]),
+        ),
+      ),
+  ]);
+  const meta = new Map(metadataRows.map((r) => [r.id, r]));
+  const ownedBefore = new Set(ownedRows.map((r) => r.cardId as string));
 
   const opened: OpenedCard[] = [];
+  const inventoryRows: (typeof inventoryItems.$inferInsert)[] = [];
+  const openingCardRows: (typeof openingCards.$inferInsert)[] = [];
   let totalValue = 0;
 
-  // Which of these cards the player already had, read BEFORE the pack is
-  // written. Reading it afterwards would count every card as already owned,
-  // because the pack itself has just inserted them.
-  const pulledIds = new Set(result.cards.map((c) => c.cardId));
-  const ownedBefore = new Set(
-    (
-      await db
-        .select({ cardId: inventoryItems.cardId })
-        .from(inventoryItems)
-        .where(
-          and(
-            eq(inventoryItems.userId, userId),
-            inArray(inventoryItems.cardId, [...pulledIds]),
-          ),
-        )
-    ).map((r) => r.cardId as string),
-  );
+  // Build the full result first, then persist each table in a single batch.
+  // The previous per-card insert loop made a normal ten-card opening issue
+  // twenty database commands before it could render the first card.
+  for (const pulled of result.cards) {
+    const m = meta.get(pulled.cardId);
+    const condition = rollPackCondition(rng);
+    const base = prices.get(pulled.cardId) ?? 0;
+    const value = computePrice(cents(base), { condition });
+    totalValue += value;
 
+    const inventoryId = randomUUID();
+    inventoryRows.push({
+      id: inventoryId,
+      userId,
+      type: 'card',
+      cardId: pulled.cardId,
+      quantity: 1,
+      condition,
+      acquisitionSource: 'pack',
+      acquisitionPrice: cents(0),
+      status: 'owned',
+    });
+    openingCardRows.push({
+      id: randomUUID(),
+      openingId,
+      cardId: pulled.cardId,
+      inventoryItemId: inventoryId,
+      slotName: pulled.slotName,
+      slotIndex: pulled.slotIndex,
+      valueAtPull: value,
+    });
+    opened.push({
+      cardId: pulled.cardId,
+      name: m?.name ?? pulled.cardId,
+      number: m?.number ?? '',
+      rarityTier: pulled.rarityTier,
+      imageSmall: m?.imageSmall ?? null,
+      imageLarge: m?.imageLarge ?? null,
+      slotName: pulled.slotName,
+      isHit: pulled.isHit,
+      isReverse: pulled.isReverse,
+      condition,
+      value,
+      inventoryId,
+    });
+  }
+
+  // The PGlite/Neon union exposes incompatible transaction generics; the
+  // driver-independent transaction surface is intentionally structural here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.transaction(async (tx: any) => {
     await tx.insert(openings).values({
       id: openingId,
@@ -287,66 +344,23 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
       templateVersion: template.version,
       cost,
       rngSeedHash: result.seedHash,
-      totalValue: 0,
+      totalValue: cents(totalValue),
     });
-
-    for (const pulled of result.cards) {
-      const m = meta.get(pulled.cardId);
-      const condition = rollPackCondition(rng);
-      const base = prices.get(pulled.cardId) ?? 0;
-      const value = computePrice(cents(base), { condition });
-      totalValue += value;
-
-      const inventoryId = randomUUID();
-      await tx.insert(inventoryItems).values({
-        id: inventoryId,
-        userId,
-        type: 'card',
-        cardId: pulled.cardId,
-        quantity: 1,
-        condition,
-        acquisitionSource: 'pack',
-        acquisitionPrice: cents(0),
-        status: 'owned',
-      });
-
-      await tx.insert(openingCards).values({
-        id: randomUUID(),
-        openingId,
-        cardId: pulled.cardId,
-        inventoryItemId: inventoryId,
-        slotName: pulled.slotName,
-        slotIndex: pulled.slotIndex,
-        valueAtPull: value,
-      });
-
-      opened.push({
-        cardId: pulled.cardId,
-        name: m?.name ?? pulled.cardId,
-        number: m?.number ?? '',
-        rarityTier: pulled.rarityTier,
-        imageSmall: m?.imageSmall ?? null,
-        imageLarge: m?.imageLarge ?? null,
-        slotName: pulled.slotName,
-        isHit: pulled.isHit,
-        isReverse: pulled.isReverse,
-        condition,
-        value,
-        inventoryId,
-      });
-    }
-
-    await tx.update(openings).set({ totalValue: cents(totalValue) }).where(eq(openings.id, openingId));
+    await tx.insert(inventoryItems).values(inventoryRows);
+    await tx.insert(openingCards).values(openingCardRows);
   });
 
   // XP is awarded after the opening is committed, so a failed write cannot
   // leave a player levelled up for a pack they never received.
   const firstTime = [...pulledIds].filter((id) => !ownedBefore.has(id)).length;
 
-  await grantXp(userId, 'pack_opened');
-  if (firstTime > 0) await grantXp(userId, 'new_card', firstTime);
-  const hits = opened.filter((c) => c.isHit).length;
-  if (hits > 0) await grantXp(userId, 'hit_pulled', hits);
+  await grantXpMany(userId, [
+    { reason: 'pack_opened', count: 1 },
+    ...(firstTime > 0 ? [{ reason: 'new_card' as const, count: firstTime }] : []),
+    ...(opened.some((c) => c.isHit)
+      ? [{ reason: 'hit_pulled' as const, count: opened.filter((c) => c.isHit).length }]
+      : []),
+  ]);
 
   return {
     openingId,
