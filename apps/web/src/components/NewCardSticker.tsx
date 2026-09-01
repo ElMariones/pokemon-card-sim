@@ -28,7 +28,7 @@ export function NewCardSticker({ className, size = "tile" }: NewCardStickerProps
         "new-card-sticker pointer-events-none absolute z-20 grid place-items-center",
         size === "reveal"
           ? "new-card-sticker--reveal -right-5 -top-5 h-24 w-24 sm:h-28 sm:w-28"
-          : "new-card-sticker--tile -right-3 -top-3 h-14 w-14 sm:h-[4.5rem] sm:w-[4.5rem]",
+          : "new-card-sticker--tile -right-3 -top-3 h-12 w-12 sm:h-16 sm:w-16",
         className,
       )}
       aria-label="New to your album"
