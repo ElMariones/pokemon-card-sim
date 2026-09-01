@@ -296,6 +296,46 @@ body {
   animation: impact-shake 460ms var(--ease-snap);
 }
 
+/* Album-completion seal: a warm, paper-like flash that reads above card art
+   without turning the whole results grid into a second source of foil. */
+.new-card-sticker {
+  filter: drop-shadow(0 5px 8px rgba(35, 15, 2, 0.42));
+  isolation: isolate;
+}
+.new-card-sticker__glow {
+  background: radial-gradient(circle, rgba(255, 246, 151, 0.92) 0%, rgba(255, 188, 46, 0.44) 42%, transparent 72%);
+  filter: blur(6px);
+}
+.new-card-sticker__edge {
+  fill: #ffd348;
+  stroke: #fff4ae;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.new-card-sticker__face {
+  fill: #ff9f27;
+  stroke: #7f3107;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.new-card-sticker__shine {
+  fill: none;
+  stroke: rgba(255, 253, 205, 0.9);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.new-card-sticker__word {
+  color: #301705;
+  font-family: var(--font-display), ui-sans-serif, sans-serif;
+  font-size: clamp(0.58rem, 2.1vw, 0.84rem);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.12em;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 250, 192, 0.85);
+  transform: rotate(-7deg) scaleX(1.08);
+}
+
 /* The booster wrapper.
    It was previously texture-only over the page background, which made a sealed
    pack read as a black rectangle. A pack is foil: it needs a base that catches

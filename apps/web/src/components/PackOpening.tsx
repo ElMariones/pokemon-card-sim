@@ -24,6 +24,7 @@ export interface OpenedCardView {
   slotName: string;
   isHit: boolean;
   isReverse: boolean;
+  isNew: boolean;
   condition: string;
   value: Cents;
 }
@@ -194,6 +195,7 @@ function PackOpeningSession({
         name: c.name,
         number: c.number,
         isHit: c.isHit,
+        isNew: c.isNew,
         isReverse: c.isReverse,
         rarityTier: c.rarityTier,
         bgClass: c.isHit
@@ -458,6 +460,7 @@ function PackOpeningSession({
                   value={c.value}
                   condition={c.condition}
                   isReverse={c.isReverse}
+                  isNew={c.isNew}
                   footer={
                     onSell ? (
                       <button

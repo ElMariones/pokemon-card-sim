@@ -195,6 +195,7 @@ export interface OpenedCard {
   slotName: string;
   isHit: boolean;
   isReverse: boolean;
+  isNew: boolean;
   condition: string;
   value: Cents;
   inventoryId: string;
@@ -275,6 +276,7 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
         and(
           eq(inventoryItems.userId, userId),
           inArray(inventoryItems.cardId, [...pulledIds]),
+          eq(inventoryItems.status, 'owned'),
         ),
       ),
   ]);
@@ -284,6 +286,7 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
   const opened: OpenedCard[] = [];
   const inventoryRows: (typeof inventoryItems.$inferInsert)[] = [];
   const openingCardRows: (typeof openingCards.$inferInsert)[] = [];
+  const newlySeen = new Set<string>();
   let totalValue = 0;
 
   // Build the full result first, then persist each table in a single batch.
@@ -297,6 +300,10 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
     totalValue += value;
 
     const inventoryId = randomUUID();
+    // The same card can theoretically occupy two different pack slots. Only
+    // the first copy advances the album, so only it earns the sticker.
+    const isNew = !ownedBefore.has(pulled.cardId) && !newlySeen.has(pulled.cardId);
+    newlySeen.add(pulled.cardId);
     inventoryRows.push({
       id: inventoryId,
       userId,
@@ -327,6 +334,7 @@ export async function buyAndOpenPack(userId: string, setId: string): Promise<Ope
       slotName: pulled.slotName,
       isHit: pulled.isHit,
       isReverse: pulled.isReverse,
+      isNew,
       condition,
       value,
       inventoryId,

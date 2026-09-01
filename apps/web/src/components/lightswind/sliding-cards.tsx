@@ -3,12 +3,14 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import { NewCardSticker } from "../NewCardSticker";
 
 export type CardContent = {
   id: string | number;
   imageUrl?: string | null;
   name?: string;
   isHit?: boolean;
+  isNew?: boolean;
 };
 
 type SlidingCardsProps = {
@@ -163,6 +165,7 @@ function FlipCard({
         {card.isHit && (
           <span className="ring-brass/80 pointer-events-none absolute inset-0 rounded-[16px] shadow-[inset_0_0_32px_rgba(211,160,60,0.45)] ring-2" />
         )}
+        {card.isNew && showFront && <NewCardSticker size="reveal" />}
       </span>
 
       {/* The back stays mounted and is simply hidden once the swap happens,

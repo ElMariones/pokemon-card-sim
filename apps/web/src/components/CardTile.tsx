@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { RaritySymbol } from "./RaritySymbol";
+import { NewCardSticker } from "./NewCardSticker";
 import type { Cents, RarityTier } from "@pcs/shared";
 
 /**
@@ -26,6 +27,7 @@ export function CardTile({
   value,
   condition,
   isReverse,
+  isNew,
   priority,
   className,
   onClick,
@@ -38,6 +40,7 @@ export function CardTile({
   value?: Cents;
   condition?: string | null;
   isReverse?: boolean;
+  isNew?: boolean;
   priority?: boolean;
   className?: string;
   onClick?: () => void;
@@ -131,6 +134,7 @@ export function CardTile({
             Reverse
           </span>
         )}
+        {isNew && <NewCardSticker />}
       </div>
 
       <div className="mt-2 flex items-start gap-1.5">
