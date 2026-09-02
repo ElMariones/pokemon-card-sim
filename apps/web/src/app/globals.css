@@ -514,8 +514,14 @@ body {
    stock settling into its slots, and the patience gauge reacting to an offer.
    Card foil remains the only rainbow treatment in the application.
    -------------------------------------------------------------------------- */
+/* `backwards`, never `both`: a finished entrance animation with `both` keeps
+   its final `transform: translateY(0)` forever, and any transform — even the
+   identity — makes the element a containing block for `position: fixed`
+   descendants. That silently reanchors modals to the page box instead of the
+   viewport. Dialogs also render through ModalPortal, which makes this
+   unbreakable rather than merely fixed. */
 .market-tab-enter {
-  animation: market-tab-arrive 360ms var(--ease-snap) both;
+  animation: market-tab-arrive 360ms var(--ease-snap) backwards;
 }
 @keyframes market-tab-arrive {
   from { opacity: 0; transform: translateY(7px); }
@@ -570,7 +576,7 @@ body {
     box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 40px -25px rgba(0,0,0,.9);
   }
 }
-.market-stock-grid > * { animation: stock-settle 440ms var(--ease-snap) both; }
+.market-stock-grid > * { animation: stock-settle 440ms var(--ease-snap) backwards; }
 .market-stock-grid > :nth-child(2) { animation-delay: 45ms; }
 .market-stock-grid > :nth-child(3) { animation-delay: 90ms; }
 .market-stock-grid > :nth-child(4) { animation-delay: 135ms; }
@@ -597,7 +603,31 @@ body {
 .market-activity:hover .market-activity-track { animation-play-state: paused; }
 @keyframes market-ticker { to { transform: translateX(-50%); } }
 
-.negotiation-drawer { animation: negotiation-enter 420ms var(--ease-snap) both; }
+/* The drawer's geometry lives here rather than in utility classes. `.pane` is
+   unlayered CSS, so its `position: relative` beats Tailwind's layered
+   `.absolute`, and every inset utility on the panel was being applied to a
+   static-flow box: the drawer collapsed to the top-left corner and grew past
+   the bottom of the screen with nothing to scroll. */
+.negotiation-drawer {
+  position: absolute;
+  inset: auto 0 0 0;
+  max-height: 94dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 18px 18px 0 0;
+  animation: negotiation-enter 420ms var(--ease-snap) backwards;
+}
+@media (min-width: 640px) {
+  .negotiation-drawer {
+    inset: 0 0 0 auto;
+    width: min(760px, 92vw);
+    max-height: none;
+    border-radius: 0;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+}
 @keyframes negotiation-enter {
   from { opacity: .45; transform: translateY(38px); }
   to { opacity: 1; transform: translateY(0); }
@@ -655,7 +685,7 @@ body {
   box-shadow: 0 0 12px color-mix(in oklab, currentColor 45%, transparent);
   transition: width 520ms var(--ease-snap), background 380ms ease;
 }
-.deal-success { animation: deal-land 620ms var(--ease-snap) both; }
+.deal-success { animation: deal-land 620ms var(--ease-snap) backwards; }
 @keyframes deal-land {
   0% { box-shadow: inset 0 0 0 rgba(116,178,138,0); }
   45% { box-shadow: inset 0 0 42px rgba(116,178,138,.12), 0 0 24px rgba(116,178,138,.08); }
