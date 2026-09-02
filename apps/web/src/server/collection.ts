@@ -205,7 +205,18 @@ export interface CollectionStats {
   bestCard: { name: string; value: Cents; imageSmall: string | null } | null;
 }
 
-export async function getCollectionStats(userId: string): Promise<CollectionStats> {
+/**
+ * Collection totals.
+ *
+ * `scope: 'shell'` skips the two reads only the collection dashboard shows.
+ * The header wants one number — the card count — and paid for a full-catalogue
+ * GROUP BY on every navigation to get it, because `setsCompleted` sits in the
+ * same function. The heavy half is opt-in rather than the default.
+ */
+export async function getCollectionStats(
+  userId: string,
+  scope: 'full' | 'shell' = 'full',
+): Promise<CollectionStats> {
   const db = await getDb();
 
   const [agg] = await db
@@ -218,6 +229,17 @@ export async function getCollectionStats(userId: string): Promise<CollectionStat
     .from(inventoryItems)
     .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
     .where(and(eq(inventoryItems.userId, userId), eq(inventoryItems.status, 'owned')));
+
+  if (scope === 'shell') {
+    return {
+      uniqueCards: Number(agg?.uniqueCards ?? 0),
+      totalCopies: Number(agg?.totalCopies ?? 0),
+      portfolioValue: cents(Number(agg?.value ?? 0)),
+      setsStarted: Number(agg?.setsStarted ?? 0),
+      setsCompleted: 0,
+      bestCard: null,
+    };
+  }
 
   const [best] = await db
     .select({ name: cards.name, value: cards.marketBasePrice, imageSmall: cards.imageSmall })

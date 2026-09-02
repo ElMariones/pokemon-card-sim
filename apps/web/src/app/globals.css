@@ -808,3 +808,33 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* --------------------------------------------------------------------------
+   Booster wrapper foil sheen.
+
+   A whole shelf of packs is on screen at once, so this loop runs in CSS rather
+   than as a framer-motion tween: one animation driver per pack ticking every
+   frame was permanent main-thread load, on or off screen.
+   -------------------------------------------------------------------------- */
+.pack-sheen {
+  opacity: .35;
+  animation: pack-sheen-breathe 5s ease-in-out infinite;
+}
+@keyframes pack-sheen-breathe {
+  50% { opacity: .7; }
+}
+
+/* The shelf's placeholder while the sets are still being read. Without it the
+   page said "No sets match that" for the length of the request. */
+.shelf-skeleton {
+  animation: shelf-skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes shelf-skeleton-pulse {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: .8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pack-sheen { animation: none; opacity: .5; }
+  .shelf-skeleton { animation: none; opacity: .6; }
+}

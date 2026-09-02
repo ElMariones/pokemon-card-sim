@@ -29,10 +29,15 @@ export default function MissionsPage() {
   usePreservedScroll();
   const [prog, setProg] = useState<Progression | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const p = await fetch("/api/progression").then((r) => (r.ok ? r.json() : null));
+    const p = await fetch("/api/progression")
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
     if (p) setProg(p);
+    else setError("Could not load your missions");
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -69,6 +74,10 @@ export default function MissionsPage() {
           Completing a set is worth more than two hundred packs. That is deliberate — the
           fastest way up is to finish what you started, not to keep buying.
         </p>
+
+        {loading && (
+          <p className="text-manila-3 pane p-6 text-sm">Reading your missions…</p>
+        )}
 
         {prog &&
           (["daily", "weekly", "long_term"] as const).map((cadence) => {

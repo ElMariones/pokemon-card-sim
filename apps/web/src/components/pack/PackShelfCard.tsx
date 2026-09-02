@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { PackWrapper } from "./PackWrapper";
@@ -39,7 +39,7 @@ export interface ShelfSet {
 }
 
 /** A shelf listing: the pack itself, what you have of the set, and the buttons. */
-export function PackShelfCard({
+function PackShelfCardImpl({
   set,
   cash,
   busy,
@@ -202,6 +202,13 @@ export function PackShelfCard({
     </li>
   );
 }
+
+/**
+ * Memoised: a shelf card is a full inline-SVG wrapper, so re-rendering the
+ * whole shelf on every keystroke in the search box was the bulk of the typing
+ * latency. The props are all stable — `onBuy` is a `useCallback` on the page.
+ */
+export const PackShelfCard = memo(PackShelfCardImpl);
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (

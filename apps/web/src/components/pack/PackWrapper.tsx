@@ -156,10 +156,16 @@ function PackArt({ setId, setName, logoUrl, part, reduceMotion }: ArtProps) {
             <rect x={W * 0.5 - 1} y="3" width="2" height={H - 6} fill="#000" opacity="0.16" />
 
             {logoHref && (
-              // No crossOrigin here: this element only paints the logo, and
-              // asking for a CORS fetch made the CDN's cached non-CORS
-              // response fail to load. Pixels are read separately, same-origin.
+              // The CORS mode has to match the sampler's `new Image()`, which
+              // sets crossOrigin="anonymous". A different mode is a different
+              // HTTP cache entry, so painting and sampling fetched the same
+              // logo twice — 145 packs downloaded 23 MB instead of 11.5.
+              //
+              // Only the same-origin proxy may ask for CORS: the CDN's cached
+              // response carries no CORS headers, which is why that indirection
+              // exists at all.
               <image
+                crossOrigin={logoHref === sameOriginLogo ? "anonymous" : undefined}
                 href={logoHref}
                 x={W * 0.08}
                 y={H * 0.26}
@@ -180,12 +186,16 @@ function PackArt({ setId, setName, logoUrl, part, reduceMotion }: ArtProps) {
               {setName.toUpperCase().slice(0, 20)}
             </text>
 
-            <motion.rect
+            {/* The sheen breathes forever, so it is a CSS animation rather
+                than a framer-motion tween: a shelf of packs meant one JS
+                animation driver per pack ticking every frame for as long as
+                the page was open. CSS hands the same loop to the compositor
+                and honours prefers-reduced-motion on its own. */}
+            <rect
+              className={reduceMotion ? undefined : "pack-sheen"}
               x="3" y="3" width={W - 6} height={H - 6}
               fill={`url(#sheen-${uid})`}
-              initial={false}
-              animate={reduceMotion ? { opacity: 0.5 } : { opacity: [0.35, 0.7, 0.35] }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              opacity={reduceMotion ? 0.5 : undefined}
             />
 
             {/* Bottom seal. */}

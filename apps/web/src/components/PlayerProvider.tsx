@@ -50,6 +50,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [collectionCount, setCollectionCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const refreshInFlight = useRef<Promise<void> | null>(null);
+  /** Whether /api/me has run once, i.e. whether the session cookie exists. */
+  const bootstrapped = useRef(false);
 
   const refresh = useCallback(async () => {
     // Focus, visibility and mutation events can arrive together. Coalescing
@@ -58,17 +60,36 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (refreshInFlight.current) return refreshInFlight.current;
 
     const task = (async () => {
-      // /api/me establishes the session cookie and every other endpoint needs
-      // it, so it is awaited before the rest rather than raced against them.
-      const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null));
-      if (me?.player) setPlayer(me.player);
+      const json = (path: string) =>
+        fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
-      const [prog, stats] = await Promise.all([
-        fetch("/api/progression").then((r) => (r.ok ? r.json() : null)),
-        fetch("/api/collection/stats").then((r) => (r.ok ? r.json() : null)),
-      ]);
-      if (prog) setProgression(prog);
-      if (stats) setCollectionCount(stats.totalCopies ?? 0);
+      // /api/me is what mints the session on a first-ever visit, and the other
+      // two 401 without it — so the very first refresh awaits it. After that the
+      // browser already holds the cookie and every request carries it, so the
+      // serial hop is pure latency on every navigation and every tab focus.
+      if (!bootstrapped.current) {
+        const me = await json("/api/me");
+        if (me?.player) setPlayer(me.player);
+        bootstrapped.current = true;
+
+        const [prog, stats] = await Promise.all([
+          json("/api/progression"),
+          json("/api/collection/stats?scope=shell"),
+        ]);
+        if (prog) setProgression(prog);
+        if (stats) setCollectionCount(stats.totalCopies ?? 0);
+      } else {
+        const [me, prog, stats] = await Promise.all([
+          json("/api/me"),
+          json("/api/progression"),
+          json("/api/collection/stats?scope=shell"),
+        ]);
+        if (me?.player) setPlayer(me.player);
+        if (prog) setProgression(prog);
+        if (stats) setCollectionCount(stats.totalCopies ?? 0);
+      }
+      // Reached even when every request failed: a network blip must not leave
+      // the shell pinned in its loading state for the life of the page.
       setLoading(false);
     })().finally(() => {
       refreshInFlight.current = null;

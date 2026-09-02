@@ -138,8 +138,11 @@ export function useLogoPalette(logoUrl: string | null | undefined): LogoPalette 
     let promise = inFlight.get(logoUrl);
     if (!promise) {
       promise = samplePalette(logoUrl)
-        .then((p) => { cache.set(logoUrl, p); return p; })
         .catch(() => FALLBACK)
+        // The failure is cached too. A set whose logo 404s on both hosts would
+        // otherwise re-sample on every remount, and each attempt is a proxied
+        // upstream fetch with a fifteen-second timeout behind it.
+        .then((p) => { cache.set(logoUrl, p); return p; })
         .finally(() => { inFlight.delete(logoUrl); });
       inFlight.set(logoUrl, promise);
     }

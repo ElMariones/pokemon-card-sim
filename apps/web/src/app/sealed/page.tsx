@@ -25,6 +25,7 @@ export default function SealedPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [opened, setOpened] = useState<{ label: string; totalValue: number; paid: number; cards: number } | null>(null);
   const [setFilter, setSetFilter] = useQueryState("set", "");
@@ -32,8 +33,19 @@ export default function SealedPage() {
   const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
-    const s = await fetch("/api/sealed").then((r) => (r.ok ? r.json() : null));
-    if (s) { setOffers(s.offers ?? []); setHoldings(s.holdings ?? []); }
+    try {
+      const res = await fetch("/api/sealed");
+      if (!res.ok) { setError("Could not read the shelf"); return; }
+      const s = await res.json();
+      setOffers(s.offers ?? []);
+      setHoldings(s.holdings ?? []);
+    } catch {
+      setError("Could not read the shelf");
+    } finally {
+      // In a finally, so a thrown fetch cannot leave the page pinned on its
+      // placeholder with nothing to explain why.
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,16 +63,11 @@ export default function SealedPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong"); return null; }
+      // buySealed is the one endpoint with no balanceAfter in its reply; the
+      // refresh below is what lands the new balance in the header for it.
       if (data?.balanceAfter != null) setHeaderCash(data.balanceAfter);
-      if (data?.offer != null && data?.balanceAfter == null) {
-        // sellSealed returns balanceAfter, openSealed returns balanceAfter; buySealed doesn't yet
-      }
       await load();
       void refresh();
-      // Ensure header reflects new balance even if endpoint didn't return it
-      if (data?.balanceAfter == null) {
-        // buySealed currently has no balanceAfter; fetch it via refresh (already queued)
-      }
       return data;
     } finally { setBusy(false); }
   };
@@ -195,6 +202,20 @@ export default function SealedPage() {
               ))}
             </select>
           </div>
+
+          {loading && (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
+              {Array.from({ length: 6 }, (_, i) => (
+                <li key={i} className="pane shelf-skeleton h-[74px] p-4" />
+              ))}
+            </ul>
+          )}
+
+          {!loading && visible.length === 0 && (
+            <p className="text-manila-3 pane p-8 text-sm">
+              Nothing on the shelf right now.
+            </p>
+          )}
 
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((o) => {

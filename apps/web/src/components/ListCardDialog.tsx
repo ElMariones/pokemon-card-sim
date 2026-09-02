@@ -68,7 +68,16 @@ export function ListCardDialog({
     if (res.ok) setOwned((await res.json()).items ?? []);
   }, [q]);
 
+  const opened = useRef(false);
   useEffect(() => {
+    // The debounce belongs to typing, not to opening. Applying it to the first
+    // load meant the dialog sat there saying "Nothing to list" for 220 ms plus
+    // a round trip before the player's own cards appeared.
+    if (!opened.current) {
+      opened.current = true;
+      void loadOwned();
+      return;
+    }
     const t = setTimeout(() => { void loadOwned(); }, 220);
     return () => clearTimeout(t);
   }, [loadOwned]);

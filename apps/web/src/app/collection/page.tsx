@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { money, relativeTime } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
@@ -83,17 +83,36 @@ export default function CollectionPage() {
     return p.toString();
   }, [debouncedQ, setId, rarity, condition, only, sort, dir, page]);
 
+  // Which request is the current one. Filters change faster than the server
+  // answers, and the "duplicates" query is much slower than an unfiltered page:
+  // clearing a filter used to let the slow earlier response land last and
+  // repaint the grid with results the filter bar no longer described.
+  const requestId = useRef(0);
+
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
-    const res = await fetch(`/api/collection?${query}`);
-    if (res.ok) {
-      const data = await res.json();
-      setItems(data.items ?? []);
-      setTotal(data.total ?? 0);
-      setPageCount(data.pageCount ?? 1);
+    try {
+      const res = await fetch(`/api/collection?${query}`);
+      if (id !== requestId.current) return;
+      if (res.ok) {
+        const data = await res.json();
+        if (id !== requestId.current) return;
+        setItems(data.items ?? []);
+        setTotal(data.total ?? 0);
+        setPageCount(data.pageCount ?? 1);
+      }
+    } catch {
+      // Leave the previous page on screen rather than blanking it.
+    } finally {
+      if (id === requestId.current) setLoading(false);
     }
-    setLoading(false);
   }, [query]);
+
+  const loadDupes = useCallback(async () => {
+    const res = await fetch("/api/collection/duplicates?keep=1");
+    if (res.ok) setDupes((await res.json()).groups ?? []);
+  }, []);
 
   const loadFacets = useCallback(async () => {
     const res = await fetch("/api/collection/facets");
@@ -260,10 +279,7 @@ export default function CollectionPage() {
           dupes={dupes}
           busy={dupeBusy}
           result={dupeResult}
-          onLoad={async () => {
-            const res = await fetch("/api/collection/duplicates?keep=1");
-            if (res.ok) setDupes((await res.json()).groups ?? []);
-          }}
+          onLoad={loadDupes}
           onSellAll={async () => {
             setDupeBusy(true);
             try {

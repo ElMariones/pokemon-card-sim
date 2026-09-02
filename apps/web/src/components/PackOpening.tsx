@@ -433,13 +433,21 @@ function PackOpeningSession({
             </dl>
           </header>
 
-          {/* staggered entrance for the grid */}
+          {/* Staggered entrance for the grid. The step shrinks as the pile
+              grows: a flat 0.06s is right for one pack, but a ten-pack lands
+              ~100 cards, and the last tile arrived six seconds after the first.
+              Capping the whole run at ~1.1s keeps the cascade readable without
+              making the player wait out the animation to see what they got. */}
           <motion.ul
             initial="hidden"
             animate="visible"
             variants={{
               hidden: {},
-              visible: { transition: { staggerChildren: 0.06 } },
+              visible: {
+                transition: {
+                  staggerChildren: Math.min(0.06, 1.1 / Math.max(cards.length, 1)),
+                },
+              },
             }}
             className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
           >

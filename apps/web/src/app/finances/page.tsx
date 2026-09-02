@@ -61,7 +61,12 @@ export default function FinancesPage() {
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedQ(q); setPage("1"); }, 220);
     return () => clearTimeout(timer);
-  }, [q, setPage]);
+    // `setPage` is deliberately not a dependency. Its identity changes whenever
+    // any query param does, so listing it made every "Next page" click re-arm
+    // this timer, which then reset the ledger to page 1 a fifth of a second
+    // later. It is only ever called, never read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ range, direction, page });

@@ -39,15 +39,22 @@ export default function GradingPage() {
   const [picked, setPicked] = useState<OwnedCard[]>([]);
   const [q, setQ] = useQueryState("q", "");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
-    const g = await fetch("/api/grading").then((r) => (r.ok ? r.json() : null));
-    if (g) {
+    try {
+      const res = await fetch("/api/grading");
+      if (!res.ok) { setError("Could not reach the grader"); return; }
+      const g = await res.json();
       setSubmissions(g.submissions ?? []);
       setTiers(g.tiers ?? []);
       setOwned(g.candidates ?? []);
+    } catch {
+      setError("Could not reach the grader");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -58,23 +65,39 @@ export default function GradingPage() {
 
   // Tick the countdowns locally, and refetch when one finishes so the grade
   // is revealed by the server rather than guessed at by the client.
+  const hasQueued = submissions.some((s) => s.status === "queued");
+
   useEffect(() => {
-    if (!submissions.some((s) => s.status === "queued")) return;
+    if (!hasQueued) return;
+    // Depends on *whether* something is queued, not on the submissions array.
+    // The tick rewrites that array every second, so listing it here tore the
+    // interval down and rebuilt it every tick, and the countdown drifted a
+    // render behind the wall clock each time.
     const t = setInterval(() => {
-      setSubmissions((prev) => {
-        let finished = false;
-        const next = prev.map((s) => {
-          if (s.status !== "queued") return s;
-          const remaining = Math.max(0, s.secondsRemaining - 1);
-          if (remaining === 0) finished = true;
-          return { ...s, secondsRemaining: remaining };
-        });
-        if (finished) void load();
-        return next;
-      });
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s.status === "queued"
+            ? { ...s, secondsRemaining: Math.max(0, s.secondsRemaining - 1) }
+            : s,
+        ),
+      );
     }, 1000);
     return () => clearInterval(t);
-  }, [submissions, load]);
+  }, [hasQueued]);
+
+  // Reveal a finished grade from the server rather than guessing it here. This
+  // is a separate effect so the tick's updater stays pure: firing the request
+  // from inside it sent two under StrictMode, which replays updaters.
+  const dueCount = submissions.filter(
+    (s) => s.status === "queued" && s.secondsRemaining === 0,
+  ).length;
+
+  useEffect(() => {
+    // Fetch resolution, not a synchronous cascade — same shape as the mount
+    // load above, which carries the same suppression.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (dueCount > 0) void load();
+  }, [dueCount, load]);
 
   const toggle = useCallback((c: OwnedCard) => {
     setPicked((prev) => {
@@ -165,7 +188,9 @@ export default function GradingPage() {
               </div>
             </div>
 
-            {owned.length === 0 ? (
+            {loading ? (
+              <p className="text-manila-3 text-sm">Fetching your ungraded cards…</p>
+            ) : owned.length === 0 ? (
               <p className="text-manila-3 text-sm">
                 No ungraded cards are available. Graded copies cannot be submitted again. <Link href="/" scroll={false} className="text-brass underline">Open a pack.</Link>
               </p>
@@ -284,7 +309,9 @@ export default function GradingPage() {
             <span className="text-manila-3 t-num text-sm tabular-nums">{submissions.length}</span>
           </h2>
 
-          {submissions.length === 0 ? (
+          {loading ? (
+            <p className="text-manila-3 pane p-6 text-sm">Checking the grader…</p>
+          ) : submissions.length === 0 ? (
             <p className="text-manila-3 pane p-6 text-sm">No submissions yet.</p>
           ) : (
             <ul className="space-y-2">

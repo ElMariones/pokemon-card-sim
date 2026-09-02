@@ -34,27 +34,45 @@ export type Database =
  * to succeed and then vanished. globalThis is shared across all of them.
  */
 const CACHE_KEY = Symbol.for('pcs.db.connection');
-type GlobalWithDb = typeof globalThis & { [CACHE_KEY]?: Database };
+type GlobalWithDb = typeof globalThis & { [CACHE_KEY]?: Promise<Database> };
 const globalRef = globalThis as GlobalWithDb;
 
 export const isPgliteMode = () => !process.env.DATABASE_URL;
 
-export async function getDb(): Promise<Database> {
-  const existing = globalRef[CACHE_KEY];
-  if (existing) return existing;
-
+/**
+ * What is cached is the *promise*, not the resolved connection.
+ *
+ * Opening one is asynchronous (a dynamic import, then a PGlite boot), so a
+ * cache written only at the end leaves the whole window open: callers that
+ * arrive during it all miss, and each opens its own connection. Route handlers
+ * make that the normal case rather than a race — `Promise.all([getSetCompletion,
+ * getBinder, getPackPrice])` calls getDb() three times in the same tick.
+ *
+ * For PGlite that is the exact failure this cache exists to prevent: several
+ * connections to one data directory, writes through one invisible to the others.
+ */
+async function openDb(): Promise<Database> {
   const url = process.env.DATABASE_URL;
   if (url) {
     const { Pool } = await import('@neondatabase/serverless');
-    const db = drizzleNeon(new Pool({ connectionString: url }), { schema });
-    globalRef[CACHE_KEY] = db;
-    return db;
+    return drizzleNeon(new Pool({ connectionString: url }), { schema });
   }
 
   const { PGlite } = await import('@electric-sql/pglite');
-  const db = drizzlePglite(new PGlite(resolveDataDir()), { schema });
-  globalRef[CACHE_KEY] = db;
-  return db;
+  return drizzlePglite(new PGlite(resolveDataDir()), { schema });
+}
+
+export function getDb(): Promise<Database> {
+  const existing = globalRef[CACHE_KEY];
+  if (existing) return existing;
+
+  // A failed open must not be cached, or the process never recovers.
+  const pending = openDb().catch((cause) => {
+    if (globalRef[CACHE_KEY] === pending) delete globalRef[CACHE_KEY];
+    throw cause;
+  });
+  globalRef[CACHE_KEY] = pending;
+  return pending;
 }
 
 /**

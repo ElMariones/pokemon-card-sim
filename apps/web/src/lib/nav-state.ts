@@ -74,8 +74,8 @@ export function useQueryState(key: string, defaultValue: string) {
 }
 
 /**
- * Preserve scroll per full URL (pathname + search) in sessionStorage.
- * On mount: restore if we have a saved position for this URL.
+ * Preserve scroll per route in sessionStorage.
+ * On mount: restore if we have a saved position for this route.
  * While mounted: throttle-save on scroll.
  * On unmount / before navigating away: flush.
  *
@@ -84,9 +84,11 @@ export function useQueryState(key: string, defaultValue: string) {
  */
 export function usePreservedScroll() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const fullKey = `${pathname}?${searchParams.toString()}`;
-  const key = `scroll:${fullKey}`;
+  // Keyed on the route only, never on the query string. Filters are written to
+  // the URL as the player types, so a key that included the search would change
+  // on every keystroke: the effect would tear down, find no saved position for
+  // the new URL, and scroll the page back to the top mid-word.
+  const key = `scroll:${pathname}`;
 
   useEffect(() => {
     const saved = sessionStorage.getItem(key);
@@ -117,16 +119,17 @@ export function usePreservedScroll() {
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    // also save on page hide / before unload for bfcache
+    // `pagehide` covers both a real unload and entering the back/forward cache.
+    // `beforeunload` is deliberately not used: registering it makes the page
+    // ineligible for bfcache in Chrome and Safari, so every browser Back became
+    // a cold reload and a full refetch — the opposite of what this hook is for.
     const onPageHide = () => save();
     window.addEventListener("pagehide", onPageHide);
-    window.addEventListener("beforeunload", onPageHide);
 
     return () => {
       save();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pagehide", onPageHide);
-      window.removeEventListener("beforeunload", onPageHide);
     };
   }, [key]);
 }

@@ -56,14 +56,21 @@ export function SellMarket() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/market");
-    if (response.ok) {
-      const data = await response.json();
-      setActive(data.active ?? []);
-      setSold(data.sold ?? []);
-      if (data.justSold?.length) { setJustSold(data.justSold); void refresh(); }
-    } else setError("Could not check your stall");
-    setLoading(false);
+    try {
+      const response = await fetch("/api/market");
+      if (response.ok) {
+        const data = await response.json();
+        setActive(data.active ?? []);
+        setSold(data.sold ?? []);
+        if (data.justSold?.length) { setJustSold(data.justSold); void refresh(); }
+      } else setError("Could not check your stall");
+    } catch {
+      setError("Could not check your stall");
+    } finally {
+      // In a finally: a rejected fetch used to skip this and leave the stall
+      // reading "Checking the display case…" for the life of the page.
+      setLoading(false);
+    }
   }, [refresh]);
 
   useEffect(() => {
