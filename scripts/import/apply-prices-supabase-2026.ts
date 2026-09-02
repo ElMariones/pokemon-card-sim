@@ -9,13 +9,13 @@
  *   npm run data:apply-prices-supabase-2026
  */
 import { readFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { normalizeRarity } from '../../packages/shared/src/index';
 import { deriveTemplate, isReverseEligible, type EngineCard } from '../../packages/pack-engine/src/index';
 import { selectBasePrice, type PriceSourceCard } from '../../packages/card-data/src/price-selection';
 import { MARKET_SNAPSHOTS, marketMedian, sourceFor } from './pack-market-prices';
 import { chunk, fetchJson, parseArgs, runScript } from './http';
+import { atom, json, linkedQuery } from './supabase';
 
 const CACHE_DIR = path.resolve('data/raw/prices');
 const CARDS_URL = (setId: string) =>
@@ -31,33 +31,6 @@ interface SourceCard {
   subtypes?: string[];
 }
 interface SourceSet { id: string; name: string; series: string }
-
-function atom(value: string | number): string {
-  if (typeof value === 'number') {
-    if (!Number.isInteger(value)) throw new Error(`Refusing non-integer SQL value: ${value}`);
-    return String(value);
-  }
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function json(value: unknown): string {
-  return `${atom(JSON.stringify(value))}::jsonb`;
-}
-
-async function linkedQuery(sql: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn('supabase', ['db', 'query', '--linked', sql], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stderr = '';
-    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`supabase db query failed (${code}): ${stderr.trim()}`));
-    });
-  });
-}
 
 async function main() {
   const args = parseArgs();
