@@ -9,3 +9,4 @@ export * from './progression';
 export * from './sealed';
 export * from './history';
 export * from './marketplace';
+export * from './npc-market';

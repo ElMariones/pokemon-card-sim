@@ -28,6 +28,7 @@
     "data:all": "npm run data:sets && npm run data:cards && npm run data:prices && npm run data:price-packs && npm run data:pack-prices",
     "data:validate": "tsx scripts/validate/validate-data.ts",
     "simulate": "tsx scripts/simulate/simulate-packs.ts",
+    "simulate:npc-market": "tsx scripts/simulate/play-npc-market.ts",
     "data:fetch-prices": "tsx scripts/import/fetch-prices.ts",
     "data:apply-prices": "tsx scripts/import/apply-prices.ts",
     "data:apply-prices-supabase-2026": "tsx scripts/import/apply-prices-supabase-2026.ts",

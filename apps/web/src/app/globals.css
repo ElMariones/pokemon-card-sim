@@ -509,6 +509,185 @@ body {
   animation: impact-shake 460ms var(--ease-snap);
 }
 
+/* --------------------------------------------------------------------------
+   Dealer circuit. The motion belongs to the counter: a case light coming on,
+   stock settling into its slots, and the patience gauge reacting to an offer.
+   Card foil remains the only rainbow treatment in the application.
+   -------------------------------------------------------------------------- */
+.market-tab-enter {
+  animation: market-tab-arrive 360ms var(--ease-snap) both;
+}
+@keyframes market-tab-arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dealer-ticket { position: relative; overflow: hidden; }
+.dealer-ticket::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--color-brass);
+  opacity: 0;
+  transform: scaleY(.35);
+  transition: opacity 180ms ease, transform 280ms var(--ease-snap);
+}
+.dealer-ticket[aria-current="true"]::after { opacity: 1; transform: scaleY(1); }
+.dealer-monogram { box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 7px 18px rgba(0,0,0,.28); }
+
+.dealer-header { isolation: isolate; }
+.dealer-case-light {
+  position: absolute;
+  inset: -65% -10% auto;
+  height: 150%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(211,160,60,.16), transparent 68%);
+  animation: dealer-light-breathe 6s ease-in-out infinite;
+}
+@keyframes dealer-light-breathe { 50% { opacity: .58; transform: scale(.96); } }
+.dealer-portrait {
+  background:
+    radial-gradient(circle at 35% 28%, rgba(247,205,114,.14), transparent 30%),
+    linear-gradient(145deg, var(--color-vitrine-3), var(--color-ink));
+  box-shadow: inset 0 0 18px rgba(211,160,60,.08), 0 12px 28px rgba(0,0,0,.38);
+}
+
+.market-stock-card {
+  overflow: hidden;
+  border: 1px solid var(--color-seam);
+  border-radius: var(--radius-pane);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 32%),
+    var(--color-vitrine);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 16px 32px -28px rgba(0,0,0,.9);
+  transition: transform 260ms var(--ease-snap), border-color 220ms ease, box-shadow 260ms ease;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .market-stock-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--color-seam-bright);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 40px -25px rgba(0,0,0,.9);
+  }
+}
+.market-stock-grid > * { animation: stock-settle 440ms var(--ease-snap) both; }
+.market-stock-grid > :nth-child(2) { animation-delay: 45ms; }
+.market-stock-grid > :nth-child(3) { animation-delay: 90ms; }
+.market-stock-grid > :nth-child(4) { animation-delay: 135ms; }
+.market-stock-grid > :nth-child(5) { animation-delay: 180ms; }
+.market-stock-grid > :nth-child(6) { animation-delay: 225ms; }
+@keyframes stock-settle {
+  from { opacity: 0; transform: translateY(13px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.market-new-stamp { animation: new-stock-pop 520ms var(--ease-snap) both; }
+@keyframes new-stock-pop {
+  0% { opacity: 0; transform: rotate(8deg) scale(.5); }
+  70% { transform: rotate(-3deg) scale(1.1); }
+  100% { opacity: 1; transform: rotate(-3deg) scale(1); }
+}
+.market-empty-slot {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 10px, rgba(255,255,255,.012) 10px 11px),
+    color-mix(in oklab, var(--color-vitrine) 72%, transparent);
+}
+
+.market-activity { mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent); }
+.market-activity-track { animation: market-ticker 42s linear infinite; }
+.market-activity:hover .market-activity-track { animation-play-state: paused; }
+@keyframes market-ticker { to { transform: translateX(-50%); } }
+
+.negotiation-drawer { animation: negotiation-enter 420ms var(--ease-snap) both; }
+@keyframes negotiation-enter {
+  from { opacity: .45; transform: translateY(38px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (min-width: 640px) {
+  @keyframes negotiation-enter {
+    from { opacity: .45; transform: translateX(38px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+}
+
+.market-offer-slider {
+  height: 24px;
+  appearance: none;
+  background: transparent;
+  cursor: grab;
+}
+.market-offer-slider:active { cursor: grabbing; }
+.market-offer-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-loss), var(--color-brass) 58%, var(--color-gain));
+}
+.market-offer-slider::-moz-range-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-loss), var(--color-brass) 58%, var(--color-gain));
+}
+.market-offer-slider::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -7.5px;
+  appearance: none;
+  border: 2px solid var(--color-brass-hot);
+  border-radius: 999px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 4px rgba(211,160,60,.15), 0 4px 10px rgba(0,0,0,.45);
+}
+.market-offer-slider::-moz-range-thumb {
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--color-brass-hot);
+  border-radius: 999px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 4px rgba(211,160,60,.15), 0 4px 10px rgba(0,0,0,.45);
+}
+
+.anger-fill {
+  min-width: 2px;
+  background: color-mix(
+    in oklab,
+    var(--color-gain) calc((100 - var(--anger)) * 1%),
+    var(--color-loss)
+  );
+  box-shadow: 0 0 12px color-mix(in oklab, currentColor 45%, transparent);
+  transition: width 520ms var(--ease-snap), background 380ms ease;
+}
+.deal-success { animation: deal-land 620ms var(--ease-snap) both; }
+@keyframes deal-land {
+  0% { box-shadow: inset 0 0 0 rgba(116,178,138,0); }
+  45% { box-shadow: inset 0 0 42px rgba(116,178,138,.12), 0 0 24px rgba(116,178,138,.08); }
+  100% { box-shadow: inset 0 0 0 rgba(116,178,138,0); }
+}
+
+.market-loading-case {
+  position: relative;
+  width: 70px;
+  height: 92px;
+  border: 1px solid var(--color-seam);
+  border-radius: 7px;
+  background: var(--color-vitrine);
+  box-shadow: inset 0 0 18px rgba(211,160,60,.05);
+}
+.market-loading-case::before,
+.market-loading-case::after,
+.market-loading-case span {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border: 1px solid var(--color-seam-bright);
+  border-radius: 4px;
+}
+.market-loading-case::after {
+  inset: -12px;
+  border-color: rgba(211,160,60,.22);
+  animation: loading-case-ring 1.6s ease-out infinite;
+}
+.market-loading-case span { inset: 18px; background: var(--color-vitrine-3); }
+@keyframes loading-case-ring { to { opacity: 0; transform: scale(1.22); } }
+
 /* Album-completion seal: a warm, paper-like flash that reads above card art
    without turning the whole results grid into a second source of foil. */
 .new-card-sticker {

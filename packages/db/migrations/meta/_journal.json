@@ -50,6 +50,13 @@
       "when": 1788312347484,
       "tag": "0006_funny_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788347468723,
+      "tag": "0007_flowery_the_liberteens",
+      "breakpoints": true
     }
   ]
 }

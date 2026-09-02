@@ -307,3 +307,70 @@ export const listings = pgTable('listings', {
   // Only one active listing per physical card; cancelled/sold rows stay for history
   uniqueIndex('listings_item_uq').on(t.inventoryItemId).where(sql`${t.status} = 'active'`),
 ]);
+
+/** One persisted stock rotation for one player-facing NPC shop. */
+export const npcShopRotations = pgTable('npc_shop_rotations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  shopId: text('shop_id').notNull(),
+  rotationNumber: integer('rotation_number').notNull(),
+  wantedCriteria: jsonb('wanted_criteria').$type<{
+    eras: string[];
+    rarityTiers: string[];
+    wantsGraded: boolean;
+    exactCardIds: string[];
+  }>().notNull(),
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  refreshAt: timestamp('refresh_at').notNull(),
+}, (t) => [
+  uniqueIndex('npc_rotations_user_shop_number_uq').on(t.userId, t.shopId, t.rotationNumber),
+  index('npc_rotations_due_idx').on(t.userId, t.shopId, t.refreshAt),
+]);
+
+/** Persistent NPC inventory. Economic snapshots make every offer replayable. */
+export const npcShopStock = pgTable('npc_shop_stock', {
+  id: text('id').primaryKey(),
+  rotationId: text('rotation_id').notNull()
+    .references(() => npcShopRotations.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  shopId: text('shop_id').notNull(),
+  slot: integer('slot').notNull(),
+  cardId: text('card_id').notNull().references(() => cards.id),
+  condition: text('condition').notNull(),
+  gradeCompany: text('grade_company'),
+  numericGrade: integer('numeric_grade'),
+  gradeLabel: text('grade_label'),
+  isBlackLabel: boolean('is_black_label').notNull().default(false),
+  marketValue: integer('market_value').notNull(),
+  askPrice: integer('ask_price').notNull(),
+  sellerFloor: integer('seller_floor').notNull(),
+  demandBand: text('demand_band').notNull(),
+  otherBuyerAt: timestamp('other_buyer_at').notNull(),
+  status: text('status').notNull().default('available'),
+  holdUserId: text('hold_user_id').references(() => users.id, { onDelete: 'set null' }),
+  holdUntil: timestamp('hold_until'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at'),
+}, (t) => [
+  uniqueIndex('npc_stock_rotation_slot_uq').on(t.rotationId, t.slot),
+  index('npc_stock_user_shop_status_idx').on(t.userId, t.shopId, t.status),
+  index('npc_stock_due_idx').on(t.status, t.otherBuyerAt),
+]);
+
+/** Stateful negotiation: a refresh can never reroll a rejected offer. */
+export const npcNegotiations = pgTable('npc_negotiations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  stockId: text('stock_id').notNull().references(() => npcShopStock.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('active'),
+  anger: integer('anger').notNull().default(0),
+  attempts: integer('attempts').notNull().default(0),
+  counterPrice: integer('counter_price').notNull(),
+  lastOffer: integer('last_offer'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('npc_negotiations_active_uq').on(t.userId, t.stockId)
+    .where(sql`${t.status} = 'active'`),
+  index('npc_negotiations_user_idx').on(t.userId, t.updatedAt),
+]);

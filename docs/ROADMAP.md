@@ -75,7 +75,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
       pointless
 - ✅ Duplicate detection and one-click bulk sale, excluding favourites and
       graded copies
-- ⬜ Auctions, buy orders, NPC shop with rent and reputation
+- ✅ Persistent NPC dealer circuit with rotating raw/graded stock
+- ✅ Server-authoritative negotiation, seller anger, wanted-card trades, and
+      lazy sales to competing collectors
+- ⬜ Auctions, buy orders, shop rent and dealer reputation
 
 ## Milestone 11 — Polish / launch
 - ⬜ Mobile, performance, sound design, monitoring, economy balance pass

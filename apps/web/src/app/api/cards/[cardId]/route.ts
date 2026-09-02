@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, eq, sql, desc } from 'drizzle-orm';
+import { and, eq, inArray, desc } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
 import { cards, sets, inventoryItems, grades } from '@pcs/db/schema';
 import { cents, type RarityTier } from '@pcs/shared';
@@ -87,7 +87,7 @@ export async function GET(
         and(
           eq(inventoryItems.userId, player.id),
           eq(inventoryItems.cardId, cardId),
-          sql`${inventoryItems.status} <> 'sold'`,
+          inArray(inventoryItems.status, ['owned', 'listed', 'grading']),
         ),
       )
       .orderBy(desc(inventoryItems.acquiredAt));

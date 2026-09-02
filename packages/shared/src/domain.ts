@@ -119,8 +119,14 @@ export const CONDITION_LABEL: Record<Condition, string> = {
   damaged: 'Damaged',
 };
 
-export type AcquisitionSource = 'pack' | 'market' | 'starter' | 'reward' | 'trade';
-export type InventoryStatus = 'owned' | 'listed' | 'grading' | 'sold';
+export type AcquisitionSource =
+  | 'pack'
+  | 'market'
+  | 'npc_market_purchase'
+  | 'starter'
+  | 'reward'
+  | 'trade';
+export type InventoryStatus = 'owned' | 'listed' | 'grading' | 'sold' | 'traded';
 
 export interface InventoryCard {
   inventoryId: string;

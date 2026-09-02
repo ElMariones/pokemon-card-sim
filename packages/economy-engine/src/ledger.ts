@@ -48,6 +48,13 @@ export interface TransactionResult {
   balanceAfter: Cents;
 }
 
+/** Transaction-shaped subset used when a larger economic action owns the transaction. */
+export interface LedgerTransaction {
+  select: any;
+  update: any;
+  insert: any;
+}
+
 /** Minimal structural type so this module does not depend on a driver. */
 interface LedgerDb {
   transaction<T>(fn: (tx: any) => Promise<T>): Promise<T>;
@@ -64,39 +71,51 @@ export async function applyTransaction(
   db: LedgerDb,
   input: TransactionInput,
 ): Promise<TransactionResult> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .select({ cash: users.cash })
-      .from(users)
-      .where(eq(users.id, input.userId))
-      .for('update')
-      .limit(1);
+  return db.transaction(async (tx) => applyTransactionInTx(tx, input));
+}
 
-    if (!row) throw new Error(`No such user: ${input.userId}`);
+/**
+ * Apply a ledger movement inside an existing transaction.
+ *
+ * Mixed card-and-cash trades must commit the debit, traded cards and purchased
+ * card together. Opening a nested transaction here would allow those pieces to
+ * diverge on drivers that do not provide true savepoints.
+ */
+export async function applyTransactionInTx(
+  tx: LedgerTransaction,
+  input: TransactionInput,
+): Promise<TransactionResult> {
+  const [row] = await tx
+    .select({ cash: users.cash })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .for('update')
+    .limit(1);
 
-    const balance = cents(row.cash);
-    const next = cents(balance + input.amount);
+  if (!row) throw new Error(`No such user: ${input.userId}`);
 
-    if (next < 0) {
-      throw new InsufficientFundsError(balance, cents(-input.amount));
-    }
+  const balance = cents(row.cash);
+  const next = cents(balance + input.amount);
 
-    await tx.update(users).set({ cash: next }).where(eq(users.id, input.userId));
+  if (next < 0) {
+    throw new InsufficientFundsError(balance, cents(-input.amount));
+  }
 
-    const transactionId = randomUUID();
-    await tx.insert(transactions).values({
-      id: transactionId,
-      userId: input.userId,
-      type: input.type,
-      amount: input.amount,
-      balanceAfter: next,
-      itemType: input.itemType ?? null,
-      itemId: input.itemId ?? null,
-      metadata: input.metadata ?? null,
-    });
+  await tx.update(users).set({ cash: next }).where(eq(users.id, input.userId));
 
-    return { transactionId, balanceAfter: next };
+  const transactionId = randomUUID();
+  await tx.insert(transactions).values({
+    id: transactionId,
+    userId: input.userId,
+    type: input.type,
+    amount: input.amount,
+    balanceAfter: next,
+    itemType: input.itemType ?? null,
+    itemId: input.itemId ?? null,
+    metadata: input.metadata ?? null,
   });
+
+  return { transactionId, balanceAfter: next };
 }
 
 /**

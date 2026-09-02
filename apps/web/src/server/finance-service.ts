@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gte, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, type Database } from "@pcs/db";
 import {
-  cards, grades, inventoryItems, listings, sets, transactions,
+  cards, grades, inventoryItems, listings, npcShopStock, sets, transactions,
 } from "@pcs/db/schema";
 import { inventoryValueSql } from "./value-sql";
 
@@ -164,6 +164,11 @@ function describeRow(
     detail = "Sealed holding sold";
   } else if (row.type === "mission_reward") {
     detail = "Mission completed";
+  } else if (row.type === "card_purchase") {
+    const card = market ?? direct;
+    label = card?.name ?? "Card purchase";
+    detail = via === "npc_dealer" ? "Bought from an NPC dealer" : "Bought on the market";
+    imageSmall = card?.imageSmall ?? null;
   }
 
   return {
@@ -200,7 +205,7 @@ export async function getFinanceDashboard(
   const heldCards = and(
     eq(inventoryItems.userId, userId),
     eq(inventoryItems.type, "card"),
-    ne(inventoryItems.status, "sold"),
+    inArray(inventoryItems.status, ["owned", "listed", "grading"]),
   );
   const value = inventoryValueSql();
 
@@ -258,7 +263,8 @@ export async function getFinanceDashboard(
   const rows = ledgerRows as LedgerRow[];
   const directIds = rows.filter((r) => r.itemType === "card" && r.itemId).map((r) => r.itemId!);
   const listingIds = rows.filter((r) => r.itemType === "listing" && r.itemId).map((r) => r.itemId!);
-  const [directRows, marketRows] = await Promise.all([
+  const npcStockIds = rows.filter((r) => r.itemType === "npc_shop_stock" && r.itemId).map((r) => r.itemId!);
+  const [directRows, listingRows, npcRows] = await Promise.all([
     directIds.length
       ? db.select({ id: cards.id, name: cards.name, imageSmall: cards.imageSmall })
           .from(cards).where(inArray(cards.id, [...new Set(directIds)]))
@@ -268,9 +274,14 @@ export async function getFinanceDashboard(
           .from(listings).innerJoin(cards, eq(cards.id, listings.cardId))
           .where(inArray(listings.id, [...new Set(listingIds)]))
       : Promise.resolve([]),
+    npcStockIds.length
+      ? db.select({ id: npcShopStock.id, name: cards.name, imageSmall: cards.imageSmall })
+          .from(npcShopStock).innerJoin(cards, eq(cards.id, npcShopStock.cardId))
+          .where(inArray(npcShopStock.id, [...new Set(npcStockIds)]))
+      : Promise.resolve([]),
   ]);
   const directMap = new Map(directRows.map((r) => [r.id, r]));
-  const marketMap = new Map(marketRows.map((r) => [r.id, r]));
+  const marketMap = new Map([...listingRows, ...npcRows].map((r) => [r.id, r]));
   const activity = rows.map((row) => describeRow(row, directMap, marketMap));
   const economicRows = rows.filter((row) => !isLedgerAdjustment(row));
   const income = economicRows.reduce((sum, row) => sum + Math.max(0, row.amount), 0);
