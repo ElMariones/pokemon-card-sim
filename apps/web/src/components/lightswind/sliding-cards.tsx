@@ -115,12 +115,11 @@ function FlipCard({
   reduceMotion: boolean;
   onFaceChange?: (faceUp: boolean, cardId: string | number) => void;
 }) {
-  const [showFront, setShowFront] = useState(false);
+  const [flipped, setFlipped] = useState(false);
 
-  // With no animation to observe, sync directly.
-  useEffect(() => {
-    if (reduceMotion) setShowFront(revealed);
-  }, [revealed, reduceMotion]);
+  // With no animation to observe there is nothing to wait for, so the card is
+  // face-up as soon as it is revealed.
+  const showFront = reduceMotion ? revealed : flipped;
 
   // The name and price are published from the same signal that paints the
   // artwork. Deriving them separately let the label appear over a card that
@@ -150,9 +149,9 @@ function FlipCard({
         const deg = Math.abs(Number(latest.rotateY) % 360);
         const front = revealed && (deg < 90 || deg > 270);
         if (!revealed) {
-          setShowFront(false);
+          setFlipped(false);
         } else if (front) {
-          setShowFront(true);
+          setFlipped(true);
         }
       }}
     >

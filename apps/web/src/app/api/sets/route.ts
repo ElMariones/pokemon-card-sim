@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { sql, eq, and, desc, asc } from 'drizzle-orm';
+import { sql, eq, desc } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
-import { sets, cards, packTemplates } from '@pcs/db/schema';
+import { sets, cards, packTemplates, inventoryItems } from '@pcs/db/schema';
+import { requirePlayer } from '@/server/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,20 @@ export async function GET(request: Request) {
   const limit = Math.min(Number(url.searchParams.get('limit') ?? 60), 200);
 
   const db = await getDb();
+  const player = await requirePlayer();
+
+  // How much of each set the player already holds, so the shop can say what a
+  // pack would actually add. Zero for a visitor without a session.
+  const ownedCards = player
+    ? sql<number>`(
+        select count(distinct i.card_id)::int
+        from ${inventoryItems} i
+        join ${cards} oc on oc.id = i.card_id
+        where oc.set_id = ${sets.id}
+          and i.user_id = ${player.id}
+          and i.status = 'owned'
+      )`
+    : sql<number>`0::int`;
 
   const rows = await db
     .select({
@@ -38,6 +53,7 @@ export async function GET(request: Request) {
       packPriceConfidence: sql<string>`max(${packTemplates.priceConfidence})`,
       packSize: sql<number>`coalesce(max(${packTemplates.cardsPerPack}), 0)::int`,
       pullConfidence: sql<string>`max(${packTemplates.confidence})`,
+      ownedCards,
     })
     .from(sets)
     .leftJoin(cards, eq(cards.setId, sets.id))

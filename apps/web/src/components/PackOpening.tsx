@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { gsap } from "gsap";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { rarityDisplay } from "@/lib/rarity-display";
@@ -10,7 +9,7 @@ import { CardTile } from "./CardTile";
 import { RaritySymbol } from "./RaritySymbol";
 import SlidingCards from "./lightswind/sliding-cards";
 import { GlassSurface } from "./GlassSurface";
-import { BoosterPackArt } from "./BoosterPackArt";
+import { PackWrapper } from "./pack/PackWrapper";
 import { CONFIDENCE_LABEL, type Cents, type RarityTier, type Confidence } from "@pcs/shared";
 
 export interface OpenedCardView {
@@ -47,6 +46,11 @@ type Phase = "sealed" | "tearing" | "revealing" | "summary";
 
 type PackOpeningProps = {
   opening: OpeningView;
+  /**
+   * How many packs this result covers. A ten-pack goes straight to the
+   * results: ninety cards turned one at a time is a chore, not a reveal.
+   */
+  packCount?: number;
   onDone?: () => void;
   onBack?: () => void;
   onOpenAgain?: () => void;
@@ -63,6 +67,7 @@ export function PackOpening(props: PackOpeningProps) {
 
 function PackOpeningSession({
   opening,
+  packCount = 1,
   onDone,
   onBack,
   onOpenAgain,
@@ -72,16 +77,19 @@ function PackOpeningSession({
 }: PackOpeningProps) {
   const handleBack = onBack ?? onDone ?? (() => {});
   const reduceMotion = useReducedMotion();
-  const [phase, setPhase] = useState<Phase>("sealed");
+  const bundle = packCount > 1;
+  const [phase, setPhase] = useState<Phase>(bundle ? "summary" : "sealed");
   const [index, setIndex] = useState(-1);
   const [faceUpIndex, setFaceUpIndex] = useState(-1);
-  // Whether the card's artwork is actually showing. Reported by the card
-  // itself, so the label can never appear over a face-down card.
-  const [frontVisible, setFrontVisible] = useState(false);
+  // Which card is showing its artwork. Reported by the card itself, so the
+  // label can never appear over a face-down card. Storing the card rather than
+  // a boolean means turning to the next card resets it by construction.
+  const [faceUpCard, setFaceUpCard] = useState<string | number | null>(null);
   const liveRef = useRef<HTMLParagraphElement>(null);
 
   const cards = opening.cards;
   const current = index >= 0 ? cards[index] : undefined;
+  const frontVisible = faceUpCard !== null && faceUpCard === current?.inventoryId;
 
   /**
    * Only the card currently on top may drive the label. A departing card
@@ -91,7 +99,7 @@ function PackOpeningSession({
   const handleFaceChange = useCallback(
     (faceUp: boolean, cardId: string | number) => {
       if (cardId !== current?.inventoryId) return;
-      setFrontVisible(faceUp);
+      setFaceUpCard(faceUp ? cardId : null);
     },
     [current?.inventoryId],
   );
@@ -100,8 +108,6 @@ function PackOpeningSession({
     setIndex(cards.length);
     setPhase("summary");
   }, [cards.length]);
-
-  useEffect(() => { setFrontVisible(false); }, [index]);
 
   /**
    * A card takes about a third of a second to fly out and the next one to
@@ -159,7 +165,7 @@ function PackOpeningSession({
     const timeout = window.setTimeout(() => {
       setPhase("revealing");
       setIndex(0);
-    }, 950);
+    }, 1150);
     return () => window.clearTimeout(timeout);
   }, [phase]);
 
@@ -221,54 +227,40 @@ function PackOpeningSession({
         </button>
       )}
 
-      {phase === "sealed" && (
+      {(phase === "sealed" || phase === "tearing") && (
         <motion.div
-          key="sealed"
+          key="wrapper"
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }}
           transition={{ duration: reduceMotion ? 0 : 0.35 }}
           className="flex flex-col items-center gap-6"
         >
+          {/* One wrapper across both phases. Rendering a second one for the
+              tear remounted the element, and a remounted layer starts at its
+              target transform — the strip vanished instead of coming off. */}
           <BoosterPack
             setId={opening.setId}
             setName={opening.setName}
             logoUrl={opening.logoUrl ?? null}
             symbolUrl={opening.symbolUrl ?? null}
             reduceMotion={!!reduceMotion}
-            phase="sealed"
+            phase={phase}
             onRip={startTear}
           />
-          <p className="text-manila-3 text-xs">
-            Press <kbd className="t-mono">Space</kbd> or click pack to rip
-          </p>
-        </motion.div>
-      )}
-
-      {phase === "tearing" && (
-        <motion.div
-          key="tearing"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex flex-col items-center gap-6"
-        >
-          <BoosterPack
-            setId={opening.setId}
-            setName={opening.setName}
-            logoUrl={opening.logoUrl ?? null}
-            symbolUrl={opening.symbolUrl ?? null}
-            reduceMotion={!!reduceMotion}
-            phase="tearing"
-            onRip={() => {}}
-          />
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-brass text-xs tracking-wide uppercase"
-          >
-            Ripping…
-          </motion.p>
+          {phase === "sealed" ? (
+            <p className="text-manila-3 text-xs">
+              Press <kbd className="t-mono">Space</kbd> or click pack to rip
+            </p>
+          ) : (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-brass text-xs tracking-wide uppercase"
+            >
+              Ripping…
+            </motion.p>
+          )}
         </motion.div>
       )}
 
@@ -282,7 +274,7 @@ function PackOpeningSession({
             className="pointer-events-none absolute top-[4%] left-1/2 hidden -translate-x-1/2 sm:block"
             aria-hidden
           >
-            <div className="relative aspect-[2.5/3.5] w-40 opacity-30">
+            <div className="relative w-36 opacity-30">
               <BoosterPack
                 setId={opening.setId}
                 setName={opening.setName}
@@ -392,7 +384,11 @@ function PackOpeningSession({
                     : "bg-vitrine-3 text-manila-3 cursor-not-allowed ring-seam ring-1",
                 )}
               >
-                {busy ? "Opening…" : `Open again · ${money(opening.cost)}`}
+                {busy
+                  ? "Opening…"
+                  : bundle
+                    ? `Open ${packCount} more · ${money(opening.cost)}`
+                    : `Open again · ${money(opening.cost)}`}
               </button>
             ) : (
               <button
@@ -408,7 +404,9 @@ function PackOpeningSession({
           <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="t-eyebrow text-manila-3">{opening.setName}</p>
-              <h2 className="t-display text-2xl">Pack results</h2>
+              <h2 className="t-display text-2xl">
+                {bundle ? `${packCount} packs opened` : "Pack results"}
+              </h2>
             </div>
             <dl className="flex gap-6 text-right">
               <div>
@@ -514,28 +512,19 @@ function BoosterPack({
       type="button"
       onClick={sealed ? onRip : undefined}
       disabled={!sealed}
-      // The pack recoils as the strip is pulled, then settles. A wrapper that
-      // simply swaps to a torn state does not read as having been opened.
-      animate={
-        reduceMotion
-          ? undefined
-          : phase === "tearing"
-            ? { y: [0, -10, 4, 0], rotate: [0, -1.6, 0.8, 0], scale: [1, 1.03, 0.99, 1] }
-            : { y: 0, rotate: 0, scale: 1 }
-      }
-      transition={{ duration: phase === "tearing" ? 0.6 : 0.3, ease: [0.3, 0, 0.2, 1] }}
-      whileHover={sealed && !reduceMotion ? { y: -8, rotate: -0.8, scale: 1.02 } : undefined}
-      whileTap={sealed && !reduceMotion ? { scale: 0.98 } : undefined}
+      whileHover={sealed && !reduceMotion ? { y: -10, rotate: -1, scale: 1.02 } : undefined}
+      whileTap={sealed && !reduceMotion ? { scale: 0.97 } : undefined}
+      transition={{ type: "spring", stiffness: 320, damping: 22 }}
       className={cn(
-        "relative block aspect-[250/350] drop-shadow-[0_26px_44px_rgba(0,0,0,0.7)]",
-        compact ? "w-40" : "w-60 sm:w-72",
+        "relative block drop-shadow-[0_26px_44px_rgba(0,0,0,0.7)]",
+        compact ? "w-36" : "w-52 sm:w-64",
         sealed
           ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-brass"
           : "cursor-default",
       )}
       aria-label={sealed ? `Rip open your ${setName} pack` : `${setName} pack, torn open`}
     >
-      <BoosterPackArt
+      <PackWrapper
         setId={setId}
         setName={setName}
         logoUrl={logoUrl}
@@ -545,35 +534,5 @@ function BoosterPack({
       {/* The surrounding view owns the instructional copy; a caption here as
           well printed "Ripping…" twice, once from each. */}
     </motion.button>
-  );
-}
-
-/**
- * The pack-specific form of React Bits' StickerPeel flap: it starts as part of
- * the wrapper, then lifts and folds away from the jagged tear line.
- */
-function PackPeelFlap() {
-  const flapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!flapRef.current) return;
-    const animation = gsap.fromTo(
-      flapRef.current,
-      { y: 0, rotationX: 0, rotationZ: 0, opacity: 1, transformOrigin: "50% 0%" },
-      { y: -92, rotationX: -72, rotationZ: -4, opacity: 0, duration: 0.58, ease: "power3.out" },
-    );
-    return () => {
-      animation.kill();
-    };
-  }, []);
-
-  return (
-    <div
-      ref={flapRef}
-      className="wrapper-mylar pointer-events-none absolute inset-x-0 top-[12%] h-[24%] [transform-style:preserve-3d]"
-      style={{ clipPath: "polygon(0 0,100% 0,100% 54%,88% 68%,74% 48%,58% 73%,43% 50%,28% 71%,14% 46%,0 64%)" }}
-    >
-      <div className="absolute inset-x-2 top-[50%] h-5 origin-left bg-gradient-to-r from-transparent via-white/85 to-transparent mix-blend-overlay" />
-    </div>
   );
 }

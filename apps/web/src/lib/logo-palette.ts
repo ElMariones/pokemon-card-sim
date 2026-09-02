@@ -124,15 +124,15 @@ async function samplePalette(url: string): Promise<LogoPalette> {
 
 /** Palette for a set logo. Returns the fallback until the sample resolves. */
 export function useLogoPalette(logoUrl: string | null | undefined): LogoPalette {
-  const [palette, setPalette] = useState<LogoPalette>(() =>
-    logoUrl ? (cache.get(logoUrl) ?? FALLBACK) : FALLBACK,
-  );
+  // A logo already sampled this session is known before the first paint, so it
+  // is read during render rather than pushed in from an effect: setting state
+  // synchronously in an effect renders the fallback first and flashes the
+  // wrapper from grey to its real colour on every remount.
+  const [sampled, setSampled] = useState<Record<string, LogoPalette>>({});
+  const resolved = logoUrl ? (sampled[logoUrl] ?? cache.get(logoUrl)) : undefined;
 
   useEffect(() => {
-    if (!logoUrl) { setPalette(FALLBACK); return; }
-
-    const cached = cache.get(logoUrl);
-    if (cached) { setPalette(cached); return; }
+    if (!logoUrl || cache.has(logoUrl)) return;
 
     let alive = true;
     let promise = inFlight.get(logoUrl);
@@ -140,13 +140,13 @@ export function useLogoPalette(logoUrl: string | null | undefined): LogoPalette 
       promise = samplePalette(logoUrl)
         .then((p) => { cache.set(logoUrl, p); return p; })
         .catch(() => FALLBACK)
-        .finally(() => inFlight.delete(logoUrl));
+        .finally(() => { inFlight.delete(logoUrl); });
       inFlight.set(logoUrl, promise);
     }
-    void promise.then((p) => { if (alive) setPalette(p); });
+    void promise.then((p) => { if (alive) setSampled((prev) => ({ ...prev, [logoUrl]: p })); });
 
     return () => { alive = false; };
   }, [logoUrl]);
 
-  return palette;
+  return resolved ?? FALLBACK;
 }

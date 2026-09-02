@@ -9,6 +9,7 @@ import { CompletionBar } from "@/components/CompletionBar";
 import { RaritySymbol } from "@/components/RaritySymbol";
 import { rarityDisplay } from "@/lib/rarity-display";
 import { CardDetail } from "@/components/CardDetail";
+import { PackOpening, type OpeningView } from "@/components/PackOpening";
 import { usePlayer } from "@/components/PlayerProvider";
 import { usePreservedScroll, useQueryState } from "@/lib/nav-state";
 import type { Cents, RarityTier } from "@pcs/shared";
@@ -38,6 +39,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   const [packPrice, setPackPrice] = useState<number | null>(null);
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [openedPack, setOpenedPack] = useState<OpeningView | null>(null);
   const [loading, setLoading] = useState(true);
   const [packError, setPackError] = useState<string | null>(null);
 
@@ -70,6 +72,10 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
 
   const affordable = packPrice !== null && player !== null ? player.cash >= packPrice : true;
 
+  /**
+   * Buying from the binder goes through the same reveal as the shop. Quietly
+   * adding the cards to the grid gave no sense of having opened anything.
+   */
   const handleOpenPack = async () => {
     setOpening(true);
     setPackError(null);
@@ -82,12 +88,46 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
       const data = await res.json();
       if (!res.ok) { setPackError(data.error ?? "Could not open pack"); return; }
       if (data.balanceAfter != null) setCash(data.balanceAfter);
-      else void refresh();
-      await load();
-      // Also refresh progression/xp in header
-      void refresh();
+      setOpenedPack({ ...data, setId: data.setId ?? setId });
     } finally { setOpening(false); }
   };
+
+  /** Back from the reveal: the binder has changed, so reload it. */
+  const handleRevealDone = useCallback(() => {
+    setOpenedPack(null);
+    void load();
+    void refresh();
+  }, [load, refresh]);
+
+  const sellFromPack = async (inventoryId: string) => {
+    const res = await fetch("/api/sell", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inventoryId }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    setCash(data.balanceAfter);
+    setOpenedPack((o) =>
+      o ? { ...o, cards: o.cards.filter((c) => c.inventoryId !== inventoryId) } : o,
+    );
+  };
+
+  if (openedPack) {
+    return (
+      <div className="mx-auto max-w-7xl px-5 py-8">
+        <PackOpening
+          opening={openedPack}
+          onBack={handleRevealDone}
+          onDone={handleRevealDone}
+          onOpenAgain={() => { setOpenedPack(null); void handleOpenPack(); }}
+          canOpenAgain={affordable}
+          busy={opening}
+          onSell={sellFromPack}
+        />
+      </div>
+    );
+  }
 
   return (
     <>
