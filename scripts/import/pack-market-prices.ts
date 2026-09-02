@@ -1,21 +1,19 @@
 /**
- * Apply a reviewed sealed-booster market snapshot.
+ * Reviewed sealed-booster market snapshots.
  *
- * The card API does not publish sealed-product values. These observations are
- * intentionally hand-curated from several markets and stored in source so a
- * price can be audited and refreshed without pretending a single listing is a
- * precise valuation. Values are USD cents; no exchange-rate conversions are
- * used. `market` observations are current market/price-guide values, while
- * `last_sold` is used only when a market has no active valuation.
+ * Data, not a script. These observations are hand-curated from several markets
+ * and carry their source URLs so a price can be audited and refreshed without
+ * pretending a single listing is a precise valuation. Values are USD cents; no
+ * exchange-rate conversions are used. `market` observations are current
+ * market/price-guide values, while `last_sold` is used only when a market has
+ * no active valuation.
  *
- * Run data:price-packs first so pack geometry and pull tables exist, then:
- *   npm run data:market-packs
+ * apply-pack-prices.ts reads these as its highest-confidence tier, above the
+ * daily TCGplayer feed: a figure three markets agree on and a human checked
+ * beats one machine reading, and it is the escape hatch when the feed is wrong
+ * about a specific product.
  */
-import { eq } from 'drizzle-orm';
-import { cents, formatCents, type Cents } from '../../packages/shared/src/index';
-import { getDb, assertNotLocked } from '../../packages/db/src/index';
-import { packTemplates } from '../../packages/db/src/schema';
-import { parseArgs, runScript } from './http';
+import { cents, type Cents } from '../../packages/shared/src/index';
 
 type ObservationKind = 'market' | 'last_sold';
 
@@ -88,7 +86,8 @@ export function sourceFor(snapshot: PackMarketSnapshot): string {
   return `market-median:${markets}@${snapshot.asOf}`;
 }
 
-function validate(snapshot: PackMarketSnapshot): void {
+/** Every snapshot must be auditable: several markets, HTTPS sources, integer cents. */
+export function validateSnapshot(snapshot: PackMarketSnapshot): void {
   if (snapshot.observations.length < 2) {
     throw new Error(`${snapshot.setId}: need at least two market observations.`);
   }
@@ -102,31 +101,4 @@ function validate(snapshot: PackMarketSnapshot): void {
   }
 }
 
-async function main() {
-  assertNotLocked();
-  const args = parseArgs();
-  const snapshots = typeof args.set === 'string'
-    ? MARKET_SNAPSHOTS.filter((s) => s.setId === args.set)
-    : MARKET_SNAPSHOTS;
-  if (snapshots.length === 0) throw new Error(`No market snapshot for ${String(args.set)}.`);
 
-  const db = await getDb();
-  for (const snapshot of snapshots) {
-    validate(snapshot);
-    const id = `${snapshot.setId}-booster`;
-    const template = (await db.select({ id: packTemplates.id }).from(packTemplates).where(eq(packTemplates.id, id)))[0];
-    if (!template) {
-      throw new Error(`${snapshot.setId}: no pack template. Run data:price-packs first.`);
-    }
-    const price = marketMedian(snapshot.observations);
-    await db.update(packTemplates).set({
-      simulatorPrice: price,
-      confidence: 'estimated',
-      source: sourceFor(snapshot),
-    }).where(eq(packTemplates.id, id));
-    console.log(`${snapshot.setId.padEnd(10)} ${formatCents(price).padStart(8)}  ${sourceFor(snapshot)}`);
-  }
-}
-
-// Keep the observation data importable by unit tests without opening a database.
-if (process.argv[1]?.endsWith('pack-market-prices.ts')) runScript(main);

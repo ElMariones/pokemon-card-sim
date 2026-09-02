@@ -113,11 +113,20 @@ export async function getPackPrice(setId: string): Promise<Cents> {
 async function getStoredPackPrice(setId: string): Promise<Cents | null> {
   const db = await getDb();
   const [stored] = await db
-    .select({ price: packTemplates.simulatorPrice })
+    .select({
+      marketPrice: packTemplates.marketBasePrice,
+      simulatorPrice: packTemplates.simulatorPrice,
+    })
     .from(packTemplates)
     .where(eq(packTemplates.id, `${setId}-booster`))
     .limit(1);
-  return stored?.price && stored.price > 0 ? cents(stored.price) : null;
+  if (!stored) return null;
+  // What the sealed pack really trades for comes first; the contents-derived
+  // figure is the fallback for sets no market covers.
+  const price = stored.marketPrice && stored.marketPrice > 0
+    ? stored.marketPrice
+    : stored.simulatorPrice;
+  return price > 0 ? cents(price) : null;
 }
 
 /** Exposed for the balance harness. */

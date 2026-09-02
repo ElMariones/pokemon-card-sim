@@ -1,5 +1,5 @@
 import { cents, scaleCents, type Cents } from '../../shared/src/index';
-import type { Condition, RarityTier } from '../../shared/src/index';
+import type { Condition, Confidence, RarityTier } from '../../shared/src/index';
 import { BP_ONE, applyBp, clampBp, composeBp, bp, type Bp } from './basis-points';
 import { conditionMultiplier } from './condition';
 
@@ -126,6 +126,78 @@ export const MIN_PACK_PRICE: Cents = cents(199);
 export function derivePackPrice(expectedValue: Cents): Cents {
   const priced = applyBp(expectedValue, PACK_HOUSE_EDGE_BP);
   return priced < MIN_PACK_PRICE ? MIN_PACK_PRICE : priced;
+}
+
+/**
+ * Where a pack's price came from, best evidence first.
+ *
+ * The derivation above is now the last resort rather than the rule. A pack is
+ * a real product with a real price: a 1999 Base Set pack trades near $850
+ * because the sealed pack is the collectible, and no amount of simulating its
+ * contents will produce that number. Pricing from contents also made every
+ * pack return the same ~85%, which left nothing for a player to know.
+ */
+export type PackPriceSource = 'curated' | 'market' | 'inherited' | 'era_median' | 'simulated';
+
+export interface PackPriceInputs {
+  /** Hand-reviewed sealed snapshot, multi-market and cited. */
+  curated?: Cents | null;
+  /** Today's quoted price for the set's booster pack. */
+  market?: Cents | null;
+  /**
+   * The parent set's pack price, for a subset that has no booster of its own.
+   * A Trainer Gallery card comes out of the parent set's pack.
+   */
+  inherited?: Cents | null;
+  /** Median real pack price of the set's era, for sets never sold as boosters. */
+  eraMedian?: Cents | null;
+  /** Simulated contents value, used only when nothing real is known. */
+  simulatedEv?: Cents | null;
+}
+
+export interface PackPriceResolution {
+  price: Cents;
+  source: PackPriceSource;
+  confidence: Confidence;
+}
+
+const quoted = (c: Cents | null | undefined): c is Cents =>
+  typeof c === 'number' && Number.isFinite(c) && c > 0;
+
+/**
+ * Resolve one pack's price.
+ *
+ * The minimum-price floor applies only to the estimated tiers. A real quote
+ * below it is reported as it stands: raising a price we actually observed
+ * would make the number a game value wearing a market label.
+ */
+export function resolvePackPrice(inputs: PackPriceInputs): PackPriceResolution | null {
+  if (quoted(inputs.curated)) {
+    return { price: inputs.curated, source: 'curated', confidence: 'documented_community_data' };
+  }
+  if (quoted(inputs.market)) {
+    return { price: inputs.market, source: 'market', confidence: 'documented_community_data' };
+  }
+  const floored = (c: Cents): Cents => (c < MIN_PACK_PRICE ? MIN_PACK_PRICE : c);
+  if (quoted(inputs.inherited)) {
+    return { price: floored(inputs.inherited), source: 'inherited', confidence: 'estimated' };
+  }
+  if (quoted(inputs.eraMedian)) {
+    return { price: floored(inputs.eraMedian), source: 'era_median', confidence: 'estimated' };
+  }
+  if (quoted(inputs.simulatedEv)) {
+    return { price: derivePackPrice(inputs.simulatedEv), source: 'simulated', confidence: 'estimated' };
+  }
+  return null;
+}
+
+/** Median of a price sample, in cents. Even samples take the midpoint. */
+export function medianCents(values: readonly Cents[]): Cents | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return cents(sorted[mid]!);
+  return cents(Math.round((sorted[mid - 1]! + sorted[mid]!) / 2));
 }
 
 /**

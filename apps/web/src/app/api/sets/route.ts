@@ -31,9 +31,11 @@ export async function GET(request: Request) {
       cardCount: sql<number>`count(${cards.id})::int`,
       pricedCount: sql<number>`count(${cards.marketBasePrice})::int`,
       avgPrice: sql<number>`coalesce(avg(${cards.marketBasePrice}), 0)::int`,
-      // The simulated pack price, so the shop can show what a pack costs
-      // before the player commits to opening one.
-      packPrice: sql<number>`coalesce(max(${packTemplates.simulatorPrice}), 0)::int`,
+      // What a pack costs, so the shop can show it before the player commits.
+      // The sealed market first, the contents derivation only where no market
+      // covers the set.
+      packPrice: sql<number>`coalesce(max(${packTemplates.marketBasePrice}), max(${packTemplates.simulatorPrice}), 0)::int`,
+      packPriceConfidence: sql<string>`max(${packTemplates.priceConfidence})`,
       packSize: sql<number>`coalesce(max(${packTemplates.cardsPerPack}), 0)::int`,
       pullConfidence: sql<string>`max(${packTemplates.confidence})`,
     })

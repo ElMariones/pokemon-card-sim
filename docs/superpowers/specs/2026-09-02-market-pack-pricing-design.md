@@ -43,8 +43,9 @@ It is therefore the **primary** card price source, with the existing
 `selectBasePrice`; tcgcsv rows are adapted into the `PriceSourceCard` shape
 rather than given a second price policy.
 
-Raw responses are cached under `data/raw/tcgcsv/`. Nothing at runtime talks to
-tcgcsv.
+Raw responses are cached under `data/raw/tcgcsv/` — gitignored and rebuildable
+with `npm run data:tcgcsv`, the same convention as the existing price cache.
+Nothing at runtime talks to tcgcsv.
 
 ### Set to TCGplayer group
 
@@ -69,8 +70,18 @@ a booster pack.
 |---|---|---|
 | 1 | hand-curated `MARKET_SNAPSHOTS` override | `documented_community_data` |
 | 2 | tcgcsv booster-pack market price | `documented_community_data` |
-| 3 | median real pack price of the set's era | `estimated` |
-| 4 | `derivePackPrice(simulatedEV)` | `estimated` |
+| 3 | the parent set's pack, for a subset with no booster of its own | `estimated` |
+| 4 | median real pack price of the set's era | `estimated` |
+| 5 | `derivePackPrice(simulatedEV)` | `estimated` |
+
+Tier 3 replaced the group-level inheritance the design first assumed. A subset
+does resolve to its parent's group by PTCGO code, but two things broke that as
+the only mechanism: TCGplayer files some subsets under their own group (Shiny
+Vaults), and abbreviations collide across eras — 'BST' is both Battle Styles and
+EX Battle Stadium, and code-first matching priced Battle Styles from a set with
+no booster pack at all. Singles now resolve name-first (`resolveCardGroup`) and
+a subset inherits from the *sibling set* sharing its PTCGO code, which is both
+more accurate and self-labelling: `price_source` reads `inherited:swsh12`.
 
 Sealed products inherit automatically: `sealedBaseValue` and
 `sealedRetailPrice` already derive boxes and ETBs from the pack price.
@@ -95,10 +106,12 @@ Chilling Reign 175%, Detective Pikachu 120%, Celebrations 108%, Paldea Evolved
 a pull-model artifact: the engine picks uniformly *within* a rarity tier, so
 sets stuffed with chase cards over-value.
 
-Decision: ship the real prices. `price-packs.ts` stops writing prices and
+Decision: ship the real prices. `price-packs.ts` stops deciding prices and
 becomes a report; the hard failure becomes a warning, with `--strict` retained.
-The economy test asserts the +EV set list against an **allowlist**, so these 7
-stay green while a newly profitable set fails CI as a pull-model regression.
+It holds the reviewed `KNOWN_PROFITABLE` allowlist — the list lives with the
+numbers that produce it rather than in a database-dependent unit test — so those
+sets stay green while a newly profitable one fails `--strict` as a suspected
+pull-model regression.
 
 ### Price movement
 
@@ -123,12 +136,35 @@ separately.
 - **Card-number matching.** tcgcsv numbers products by `extendedData.Number`
   ("001/132"); promo and gallery numbering (`TG01`, `GG01`, `SWSH001`) is where
   this goes quietly wrong. The importer reports a per-set match rate and refuses
-  a set below 90% unless `--force` is passed.
+  a set below 90% unless `--force` is passed. It earned its keep immediately:
+  it caught `bw1` matching the BW *Trainer Kit* and `swsh5` matching EX Battle
+  Stadium, both via colliding abbreviations.
 - **Third-party availability.** tcgcsv rate-limits with a non-JSON page, which
   is how a parallel probe silently produced 220 corrupt files. The fetcher is
-  serial, delayed, and retries on parse failure. The cache is committed.
+  serial, delayed, and retries on parse failure.
 - **The +EV sets are a real grind loop** until the pull model weights within
   tier. The report makes them visible on every run.
+
+## Outcome
+
+145 templates: 4 curated, 98 quoted by the market, 7 inherited from a parent
+set, 23 era medians, 13 left on the contents derivation (the e-Card era and the
+cross-era "other" sets have no quoted pack anywhere). Card prices went from
+19,653 to 20,330, with the four 2026 sets priced for the first time.
+
+Hold return across the 138 non-subset sets now spans 4.5% (a $800 EX-era pack
+whose singles are worth $36) to 467% (Black Bolt), mean 46%, median 22% —
+against a flat 85% for every set before. That spread is the point.
+
+Two findings the report surfaces rather than hides:
+
+- **Subset "packs" are not real products.** A Trainer Gallery or Shiny Vault has
+  no booster of its own, so it is priced from the parent's pack and then dealt
+  as 30 chase cards: 642%-2,256% return. The fix belongs in the pack engine —
+  those cards belong in the parent set's pull tables — not in pricing.
+- **Era-median sets read low** (mean 15%), because a promo set priced at its
+  era's median pack price has nothing like a booster's contents. They were
+  never openable products either.
 
 ## Testing
 

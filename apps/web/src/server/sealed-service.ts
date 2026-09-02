@@ -62,6 +62,12 @@ function currentSealedValue(
   return applyBp(base, trend);
 }
 
+/**
+ * What one pack costs: the sealed market when we have it, the contents-derived
+ * figure only where no market covers the set (DESIGN.md section 14).
+ */
+const EFFECTIVE_PACK_PRICE = sql<number>`coalesce(${packTemplates.marketBasePrice}, ${packTemplates.simulatorPrice})::int`;
+
 /** Sealed products available to buy, for sets we can price. */
 export async function listSealedOffers(limit = 60): Promise<SealedOffer[]> {
   const db = await getDb();
@@ -72,11 +78,13 @@ export async function listSealedOffers(limit = 60): Promise<SealedOffer[]> {
       setName: sets.name,
       logoUrl: sets.logoUrl,
       releaseDate: sets.releaseDate,
-      packPrice: packTemplates.simulatorPrice,
+      // A box is priced from what its packs really cost, so it has to read
+      // the same effective price the shop and the opening path do.
+      packPrice: EFFECTIVE_PACK_PRICE,
     })
     .from(packTemplates)
     .innerJoin(sets, eq(sets.id, packTemplates.setId))
-    .where(sql`${packTemplates.simulatorPrice} > 0`)
+    .where(sql`coalesce(${packTemplates.marketBasePrice}, ${packTemplates.simulatorPrice}) > 0`)
     .orderBy(desc(sets.releaseDate))
     .limit(limit);
 
@@ -134,7 +142,7 @@ async function ensureProduct(setId: string, type: ProductType, packPrice: Cents)
 async function packPriceFor(setId: string): Promise<Cents> {
   const db = await getDb();
   const [t] = await db
-    .select({ price: packTemplates.simulatorPrice })
+    .select({ price: EFFECTIVE_PACK_PRICE })
     .from(packTemplates)
     .where(eq(packTemplates.id, `${setId}-booster`))
     .limit(1);

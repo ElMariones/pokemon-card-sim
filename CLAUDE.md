@@ -17,6 +17,11 @@ this file is the set of rules that keep the code honest.
    `normalizeRarity`; keep `rarityRaw` for display only.
 5. **Every money movement writes a `transactions` row** with `balanceAfter`.
    The ledger is the audit trail.
+6. **A pack's price is real market data.** `market_base_price` first, the
+   contents-derived `simulator_price` only where no market covers the set. A
+   set whose contents beat its price is a real market fact, not a bug — but a
+   newly appearing one is usually a pull-model bug, which is what
+   `data:price-packs --strict` is for.
 
 ## Package boundaries (DESIGN.md §35)
 
@@ -37,9 +42,14 @@ dialect is identical.
 
 ```bash
 npm run db:push      # create tables
-npm run data:all     # import catalogue + prices
+npm run data:all     # import catalogue + prices (singles and sealed)
 npm run dev
 ```
+
+`data:all` runs, in order: sets, cards, prices (tcgcsv then the API fallback),
+`data:price-packs` (measures contents, creates templates), and
+`data:pack-prices` (writes the real sealed price). The last two are ordered:
+pack prices need the templates to exist.
 
 ### PGlite is single-process. This will bite you.
 
@@ -66,7 +76,12 @@ update succeeding and then silently reverting.
 ## Data sources
 
 - Catalogue: `PokemonTCG/pokemon-tcg-data` bulk JSON on GitHub (no rate limit).
-- Prices: `api.pokemontcg.io/v2` (TCGplayer + Cardmarket), no key required.
+- Prices: `tcgcsv.com`, TCGplayer's own daily export, cached per group under
+  `data/raw/tcgcsv`. `api.pokemontcg.io/v2` is the fallback for cards it misses.
+  Both feeds go through `selectBasePrice`, never a second price policy.
+- Sealed: the same tcgcsv export carries booster packs, boxes and ETBs. Pack
+  price comes from there, not from the pack's simulated contents — see
+  `apply-pack-prices.ts` and DESIGN.md §14.
 - Images: hotlinked from `images.pokemontcg.io` through the `CardImageAsset`
   indirection, so they can be moved to our own storage without touching
   gameplay code.

@@ -20,6 +20,12 @@ export const sets = pgTable('sets', {
   name: text('name').notNull(),
   series: text('series').notNull(),
   era: text('era').notNull(),
+  /**
+   * The set's PTCGO code ('SIT', 'MEW'). Published by both the catalogue and
+   * TCGplayer, which makes it the one reliable key between them. A subset
+   * carries its parent's code, so it resolves to the parent's products.
+   */
+  ptcgoCode: text('ptcgo_code'),
   releaseDate: text('release_date').notNull(),
   printedTotal: integer('printed_total').notNull().default(0),
   total: integer('total').notNull().default(0),
@@ -51,6 +57,8 @@ export const cards = pgTable('cards', {
   /** Baseline market price in cents; null when no price source covers the card. */
   marketBasePrice: integer('market_base_price'),
   priceConfidence: text('price_confidence').notNull().default('unknown'),
+  /** Which feed the baseline came from, e.g. 'tcgcsv' or 'pokemontcg.io'. */
+  priceSource: text('price_source'),
   priceUpdatedAt: timestamp('price_updated_at'),
   source: text('source').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -71,7 +79,17 @@ export const packTemplates = pgTable('pack_templates', {
   cardsPerPack: integer('cards_per_pack').notNull(),
   /** Ordered PackSlot[]; see @pcs/shared domain types. */
   slots: jsonb('slots').$type<unknown[]>().notNull(),
+  /** Contents-derived price. Kept as a diagnostic and as the last-resort price. */
   simulatorPrice: integer('simulator_price').notNull(),
+  /**
+   * What the sealed pack actually trades for, in cents. Real-world data, the
+   * same standing as cards.market_base_price; null when no market covers it.
+   */
+  marketBasePrice: integer('market_base_price'),
+  priceConfidence: text('price_confidence').notNull().default('unknown'),
+  /** Provenance of market_base_price, e.g. 'tcgplayer:692944'. */
+  priceSource: text('price_source'),
+  priceUpdatedAt: timestamp('price_updated_at'),
   confidence: text('confidence').notNull(),
   source: text('source').notNull(),
   version: integer('version').notNull().default(1),

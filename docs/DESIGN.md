@@ -665,6 +665,21 @@ Each product should contain a configurable payload:
 }
 ```
 
+### Pack price is market data, not a formula
+
+A pack costs what the sealed pack trades for, imported alongside card prices
+and stored as `pack_templates.market_base_price` with its own confidence. It is
+deliberately not derived from the pack's contents: sealed product is priced as a
+collectible, which is why a 1999 Base Set pack costs ~$846 while its cards are
+worth a fraction of that, and why a hyped modern pack can be worth less than the
+singles inside it. Deriving the price from the contents made every pack in the
+game return the same ~85% and left nothing for a player to know.
+
+Where no market covers a set — promos, McDonald's sets, trainer kits, POP
+Series, none of which were ever sold as boosters — the price falls back to the
+median real pack price of the set's era, and finally to the contents derivation.
+The fallbacks are tagged `estimated`; only observed prices are not.
+
 ### Sealed investment
 
 Product price can evolve independently from the price of its individual cards.
@@ -1677,6 +1692,14 @@ The game should create different valid strategies.
 ### Opening should be exciting, not always profitable.
 
 If expected pack value is always higher than pack price, players will simply spam open.
+
+Note the word *always*. Pack prices are real sealed-market prices, and the real
+market does leave a handful of modern sets whose singles are worth more than the
+pack. Those stay in the game: knowing which ones is exactly the knowledge the
+market loops are supposed to reward. `data:price-packs` lists every set whose
+contents beat its price and flags any that is not on the reviewed list, because
+a *new* one usually means the pull model over-values that set rather than that
+the market moved.
 
 ### Selling duplicates should provide liquidity.
 

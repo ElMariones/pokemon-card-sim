@@ -16,6 +16,7 @@ interface SourceSet {
   id: string;
   name: string;
   series: string;
+  ptcgoCode?: string;
   printedTotal?: number;
   total?: number;
   releaseDate?: string;
@@ -37,6 +38,7 @@ async function main() {
       series: s.series ?? 'Other',
       era: deriveEra(s.series),
       releaseDate: normalizeDate(s.releaseDate),
+      ptcgoCode: s.ptcgoCode ?? null,
       printedTotal: s.printedTotal ?? 0,
       total: s.total ?? 0,
       logoUrl: s.images?.logo ?? null,
@@ -55,6 +57,7 @@ async function main() {
         series: sql_excluded('series'),
         era: sql_excluded('era'),
         releaseDate: sql_excluded('release_date'),
+        ptcgoCode: sql_excluded('ptcgo_code'),
         printedTotal: sql_excluded('printed_total'),
         total: sql_excluded('total'),
         logoUrl: sql_excluded('logo_url'),

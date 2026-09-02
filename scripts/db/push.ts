@@ -16,8 +16,12 @@ async function main() {
     const { migrate } = await import('drizzle-orm/pglite/migrator');
 
     const dir = resolveDataDir();
-    const db = drizzle(new PGlite(dir));
-    await migrate(db, { migrationsFolder: MIGRATIONS });
+    // Hold the client: an open PGlite instance keeps the event loop alive, so
+    // without the close() below the script applies its migrations and then
+    // hangs forever with nothing left to say.
+    const client = new PGlite(dir);
+    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS });
+    await client.close();
     console.log(`Migrations applied to PGlite at ${dir}`);
     return;
   }
