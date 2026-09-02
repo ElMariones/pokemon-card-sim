@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cents } from '@pcs/shared';
 import { requirePlayer } from '@/server/session';
 import { buyNow } from '@/server/npc-market-service';
 import { GameError } from '@/server/game';
@@ -16,15 +17,24 @@ export async function POST(request: Request) {
     || !body.tradeInventoryIds.every((id) => typeof id === 'string')) {
     return NextResponse.json({ error: 'Purchase details are incomplete' }, { status: 400 });
   }
+  // The price the player was looking at when they pressed the button. The sale
+  // is refused rather than settled at a different number.
+  if (body.expectedTotal !== undefined
+    && (typeof body.expectedTotal !== 'number' || !Number.isInteger(body.expectedTotal))) {
+    return NextResponse.json({ error: 'Purchase details are incomplete' }, { status: 400 });
+  }
   try {
     return NextResponse.json(await buyNow(
       player.id,
       body.stockId,
       body.tradeInventoryIds as string[],
+      undefined,
+      body.expectedTotal === undefined ? undefined : cents(body.expectedTotal),
     ));
   } catch (error) {
     if (error instanceof GameError) {
-      const status = error.code === 'stock_unavailable' ? 409 : 400;
+      const status = error.code === 'stock_unavailable' ? 409
+        : error.code === 'price_moved' ? 409 : 400;
       return NextResponse.json({ error: error.message, code: error.code }, { status });
     }
     console.error('NPC buy-now failed', error);

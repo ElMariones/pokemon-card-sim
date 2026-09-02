@@ -41,6 +41,9 @@
       "@pcs/economy-engine": [
         "../../packages/economy-engine/src/index.ts"
       ],
+      "@pcs/economy-engine/marketplace": [
+        "../../packages/economy-engine/src/marketplace.ts"
+      ],
       "@pcs/card-data": [
         "../../packages/card-data/src/index.ts"
       ],

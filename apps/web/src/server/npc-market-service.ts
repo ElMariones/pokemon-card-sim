@@ -31,6 +31,7 @@ import {
 import {
   cents,
   CONDITION_LABEL,
+  formatCents,
   type Cents,
   type Condition,
   type RarityTier,
@@ -734,11 +735,21 @@ export async function makeOffer(
   }
 }
 
+/**
+ * Buy at whatever the dealer is asking *right now*.
+ *
+ * Once haggling has started that is the negotiation's counter, not the sticker
+ * on the case — a dealer who has come down to $10.13 does not get to charge
+ * $11.64 because the player used a different button. `expectedTotal` is the
+ * price the player was shown; if the two disagree the sale is refused rather
+ * than silently settled at the higher number.
+ */
 export async function buyNow(
   userId: string,
   stockId: string,
   tradeInventoryIds: string[],
   database?: Database,
+  expectedTotal?: Cents,
 ) {
   const db = database ?? await getDb();
   const now = new Date();
@@ -752,15 +763,27 @@ export async function buyNow(
         await eligibleTrades(userId, stock.id, dealer, tx),
         tradeInventoryIds,
       );
-      const [activeNegotiation] = await tx.select({ id: npcNegotiations.id })
-        .from(npcNegotiations)
+      const [activeNegotiation] = await tx.select({
+        id: npcNegotiations.id,
+        counterPrice: npcNegotiations.counterPrice,
+      }).from(npcNegotiations)
         .where(and(
           eq(npcNegotiations.userId, userId),
           eq(npcNegotiations.stockId, stock.id),
           eq(npcNegotiations.status, 'active'),
         )).limit(1);
+      const askingPrice = cents(Math.min(
+        stock.askPrice,
+        activeNegotiation?.counterPrice ?? stock.askPrice,
+      ));
+      if (expectedTotal != null && expectedTotal !== askingPrice) {
+        throw new GameError(
+          `${dealer.name} is asking ${formatCents(askingPrice)} now, not ${formatCents(expectedTotal)}.`,
+          'price_moved',
+        );
+      }
       return settlePurchaseTx(
-        tx, userId, stock, activeNegotiation?.id ?? null, cents(stock.askPrice), selected, now,
+        tx, userId, stock, activeNegotiation?.id ?? null, askingPrice, selected, now,
       );
     });
   } catch (error) {

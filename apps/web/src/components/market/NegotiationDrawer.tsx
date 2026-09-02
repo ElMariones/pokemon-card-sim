@@ -29,6 +29,25 @@ function localRisk(offer: number, counter: number, anger: number) {
   return "Insulting";
 }
 
+/** The lowest the dealer will let you go before the slider stops. */
+function minimumFor(counterPrice: number) {
+  return Math.max(1, Math.round(counterPrice * 0.45));
+}
+
+/**
+ * Where the slider starts: a real opening haggle, not the dealer's own number.
+ *
+ * Offering the counter in full is always accepted, so a slider that starts at
+ * its maximum turns an untouched "Make offer" into an instant full-price
+ * purchase. Accepting is its own button; the slider is for bargaining.
+ */
+function openingBid(counterPrice: number) {
+  return Math.max(
+    minimumFor(counterPrice),
+    Math.min(counterPrice - 1, Math.round(counterPrice * 0.9)),
+  );
+}
+
 function holdLabel(until: string, now: number) {
   const seconds = Math.max(0, Math.ceil((new Date(until).getTime() - now) / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -72,13 +91,32 @@ export function NegotiationDrawer({
       if (!response.ok) throw new Error(json.error ?? "Could not start this negotiation");
       setNegotiation(json.negotiation);
       setTrades(json.trades ?? []);
-      setOffer(json.negotiation.counterPrice);
+      setOffer(openingBid(json.negotiation.counterPrice));
       setNow(new Date(json.negotiation.holdUntil).getTime() - 5 * 60 * 1_000);
     }).catch((cause) => {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       setError(cause instanceof Error ? cause.message : "Could not start this negotiation");
     });
     return () => controller.abort();
+  }, [stock.id]);
+
+  /** Re-read the dealer's live position after the client's view goes stale. */
+  const resync = useCallback(async () => {
+    try {
+      const response = await fetch("/api/market/negotiate/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stockId: stock.id }),
+      });
+      const json = await response.json();
+      if (!response.ok) return;
+      setNegotiation(json.negotiation);
+      setTrades(json.trades ?? []);
+      setSelected([]);
+      setOffer(openingBid(json.negotiation.counterPrice));
+    } catch {
+      // Leave the error already on screen; there is nothing better to say.
+    }
   }, [stock.id]);
 
   useEffect(() => {
@@ -104,7 +142,17 @@ export function NegotiationDrawer({
   const tradeTotal = selectedCards.reduce((sum, card) => sum + card.credit, 0);
   const cashDue = Math.max(1, offer - tradeTotal);
   const risk = negotiation ? localRisk(offer, negotiation.counterPrice, negotiation.anger) : "Comfortable";
-  const minimumOffer = negotiation ? Math.max(1, Math.round(negotiation.counterPrice * 0.45)) : 1;
+  const minimumOffer = negotiation ? minimumFor(negotiation.counterPrice) : 1;
+  // Offering the counter in full is always accepted, so the slider stops just
+  // short of it: "Make offer" haggles, "Accept" buys.
+  const maximumOffer = negotiation ? Math.max(minimumOffer, negotiation.counterPrice - 1) : 1;
+  // What the dealer is asking right now — the counter once they have moved off
+  // the sticker. This is the number the server will charge.
+  const dealerPrice = negotiation
+    ? Math.min(stock.askPrice, negotiation.counterPrice)
+    : stock.askPrice;
+  const hasHaggled = dealerPrice < stock.askPrice;
+  const dealerCashDue = Math.max(1, dealerPrice - tradeTotal);
 
   const close = useCallback(() => {
     if (negotiation && negotiation.attempts > 0 && !purchased && !walked
@@ -150,15 +198,15 @@ export function NegotiationDrawer({
     setSelected((current) => [...current, card.inventoryId]);
   };
 
-  const submit = async (buyAtCounter = false) => {
+  const submit = async (accept = false) => {
     if (!negotiation) return;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const endpoint = buyAtCounter ? "/api/market/buy-now" : "/api/market/negotiate/offer";
-      const body = buyAtCounter
-        ? { stockId: stock.id, tradeInventoryIds: selected }
+      const endpoint = accept ? "/api/market/buy-now" : "/api/market/negotiate/offer";
+      const body = accept
+        ? { stockId: stock.id, tradeInventoryIds: selected, expectedTotal: dealerPrice }
         : { stockId: stock.id, negotiationId: negotiation.id, totalOffer: offer, tradeInventoryIds: selected };
       const response = await fetch(endpoint, {
         method: "POST",
@@ -166,7 +214,14 @@ export function NegotiationDrawer({
         body: JSON.stringify(body),
       });
       const json = await response.json();
-      if (!response.ok) { setError(json.error ?? "The deal could not be completed"); return; }
+      if (!response.ok) {
+        setError(json.error ?? "The deal could not be completed");
+        // The price we were showing is stale — an idle hold expires and the
+        // dealer goes back to the sticker. Pull the live one rather than
+        // leaving a button that promises a number nobody will honour.
+        if (json.code === "price_moved" || json.code === "hold_expired") await resync();
+        return;
+      }
       if (json.purchased) {
         setPurchased(true);
         setCash(json.balanceAfter);
@@ -189,9 +244,11 @@ export function NegotiationDrawer({
       } : current);
       const tradesNoLongerFit = tradeTotal >= json.counterPrice;
       if (tradesNoLongerFit) setSelected([]);
-      setOffer(tradesNoLongerFit
-        ? Math.max(1, json.counterPrice - 1)
-        : Math.max(tradeTotal + 1, json.counterPrice - 1, Math.round((offer + json.counterPrice) / 2)));
+      const nextFloor = tradesNoLongerFit ? 1 : tradeTotal + 1;
+      setOffer(Math.min(
+        json.counterPrice - 1,
+        Math.max(nextFloor, Math.round((offer + json.counterPrice) / 2)),
+      ));
       setMessage(
         `${dealer.name} rejected the offer and moved to ${money(json.counterPrice as Cents)}.`
         + (tradesNoLongerFit ? " Your selected trades were cleared because their credit now exceeds the counter." : ""),
@@ -266,7 +323,7 @@ export function NegotiationDrawer({
                         <p className="t-num text-2xl">{money(offer as Cents)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[11px] text-manila-3">Current counter</p>
+                        <p className="text-[11px] text-manila-3">{hasHaggled ? `${dealer.name} will take` : "Current counter"}</p>
                         <p className="t-num text-sm text-brass">{money(negotiation.counterPrice)}</p>
                       </div>
                     </div>
@@ -274,9 +331,9 @@ export function NegotiationDrawer({
                       aria-label="Total offer"
                       type="range"
                       min={minimumOffer}
-                      max={negotiation.counterPrice}
+                      max={maximumOffer}
                       step={Math.max(1, Math.round(negotiation.counterPrice / 200))}
-                      value={Math.max(minimumOffer, Math.min(offer, negotiation.counterPrice))}
+                      value={Math.max(minimumOffer, Math.min(offer, maximumOffer))}
                       onChange={(event) => {
                         const next = Number(event.target.value);
                         setOffer(next <= tradeTotal ? tradeTotal + 1 : next);
@@ -354,7 +411,13 @@ export function NegotiationDrawer({
 
                   <div className="mt-5 grid grid-cols-2 gap-3 border-t border-seam pt-4 text-sm">
                     <span className="text-manila-2">Trade credit</span><span className="t-num text-right">−{money(tradeTotal as Cents)}</span>
-                    <span className="text-manila-2">Cash due</span><span className="t-num text-right text-brass">{money(cashDue as Cents)}</span>
+                    <span className="text-manila-2">Cash due if they accept</span><span className="t-num text-right text-brass">{money(cashDue as Cents)}</span>
+                    {hasHaggled && (
+                      <>
+                        <span className="text-manila-2">Cash due if you accept {money(dealerPrice as Cents)}</span>
+                        <span className="t-num text-right text-brass">{money(dealerCashDue as Cents)}</span>
+                      </>
+                    )}
                   </div>
 
                   {player && cashDue > player.cash && (
@@ -363,7 +426,14 @@ export function NegotiationDrawer({
                   <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <button type="button" onClick={close} disabled={busy} className="min-h-11 rounded-pane px-4 text-sm text-manila-2 hover:text-manila disabled:opacity-40">Walk away</button>
                     <button type="button" onClick={() => void submit(false)} disabled={busy || !negotiation || (player ? cashDue > player.cash : false)} className="min-h-11 rounded-pane px-4 text-sm font-semibold ring-1 ring-seam hover:ring-brass disabled:opacity-40">Make offer</button>
-                    <button type="button" onClick={() => void submit(true)} disabled={busy || !negotiation || (player ? stock.askPrice - tradeTotal > player.cash : false) || tradeTotal >= stock.askPrice} className="min-h-11 rounded-pane bg-brass px-4 text-sm font-semibold text-ink hover:bg-brass-hot disabled:opacity-40">Pay sticker · {money(Math.max(1, stock.askPrice - tradeTotal) as Cents)}</button>
+                    <button
+                      type="button"
+                      onClick={() => void submit(true)}
+                      disabled={busy || !negotiation || (player ? dealerCashDue > player.cash : false) || tradeTotal >= dealerPrice}
+                      className="min-h-11 rounded-pane bg-brass px-4 text-sm font-semibold text-ink hover:bg-brass-hot disabled:opacity-40"
+                    >
+                      {hasHaggled ? "Accept" : "Pay sticker"} · {money(dealerCashDue as Cents)}
+                    </button>
                   </div>
                 </>
               )}

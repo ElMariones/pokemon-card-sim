@@ -217,11 +217,15 @@ function seededVisitRng(listingId: string, visitIndex: number): Rng {
 /**
  * What the seller actually receives after the marketplace takes its cut.
  *
- * The fee rounds down, so a sale under 20 cents pays nothing — 5% of a penny
- * is not a penny. That is deliberate rather than an oversight: charging a
- * minimum fee on bulk would mean handing over a card and receiving zero, which
- * is a worse outcome than the rounding it was meant to prevent. The amounts
- * involved are trivial by construction.
+ * `applyBp` rounds to the nearest cent, so the fee disappears below ten cents
+ * rather than below twenty — 5% of a penny is not a penny. That is deliberate
+ * rather than an oversight: charging a minimum fee on bulk would mean handing
+ * over a card and receiving zero, which is a worse outcome than the rounding it
+ * was meant to prevent. The amounts involved are trivial by construction.
+ *
+ * This is the only fee rule. Anything quoting a seller a number — the listing
+ * dialog included — calls it rather than reimplementing `price * 0.95`, which
+ * disagrees on every odd multiple of ten cents.
  */
 export function netProceeds(salePrice: Cents): { fee: Cents; net: Cents } {
   const fee = applyBp(salePrice, MARKETPLACE_FEE_BP);
@@ -230,5 +234,5 @@ export function netProceeds(salePrice: Cents): { fee: Cents; net: Cents } {
 
 /** The smallest sale that actually pays a fee, given the rounding above. */
 export const MIN_FEE_BEARING_SALE: Cents = cents(
-  Math.ceil(10_000 / MARKETPLACE_FEE_BP),
+  Math.ceil(5_000 / MARKETPLACE_FEE_BP),
 );

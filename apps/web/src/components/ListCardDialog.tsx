@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
+import { netProceeds } from "@pcs/economy-engine/marketplace";
 import { ModalPortal } from "@/components/ModalPortal";
-import type { Cents } from "@pcs/shared";
+import { cents, type Cents } from "@pcs/shared";
 
 interface OwnedCard {
   inventoryId: string; cardId: string; name: string; number: string;
@@ -112,7 +113,10 @@ export function ListCardDialog({
   };
 
   const ratio = guide && guide.marketValue > 0 ? ask / guide.marketValue : 1;
-  const net = Math.round(ask * 0.95);
+  // The engine's rule, not a second copy of it: `ask * 0.95` disagrees with the
+  // fee the ledger actually charges on every odd multiple of ten cents, and the
+  // number quoted here has to be the number the player receives.
+  const net = netProceeds(cents(ask)).net;
 
   return (
     <ModalPortal>

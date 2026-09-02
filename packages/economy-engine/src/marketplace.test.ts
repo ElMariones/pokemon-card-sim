@@ -173,6 +173,20 @@ describe('proceeds', () => {
     }
   });
 
+  it('names the actual threshold: one cent lower pays no fee at all', () => {
+    expect(netProceeds(cents(MIN_FEE_BEARING_SALE - 1)).fee).toBe(0);
+  });
+
+  it('is the only fee rule — `price * 0.95` is not the same function', () => {
+    // The listing dialog used to quote sellers `Math.round(ask * 0.95)`, which
+    // is a cent too generous on every odd multiple of ten.
+    const disagreements = [];
+    for (let price = 1; price <= 10_000; price += 1) {
+      if (netProceeds(cents(price)).net !== Math.round(price * 0.95)) disagreements.push(price);
+    }
+    expect(disagreements.slice(0, 3)).toEqual([10, 30, 50]);
+  });
+
   it('waives the fee on bulk rather than paying the seller nothing', () => {
     // 5% of a penny is not a penny. Charging a minimum here would mean handing
     // over a card and receiving zero.
