@@ -125,7 +125,8 @@ function PackOpeningSession({
   const advance = useCallback(() => {
     if (locked) return;
     setLocked(true);
-    setFrontVisible(false);
+    // No need to clear the face-up flag: it names the card it belongs to, and
+    // the card is about to change.
     if (index >= cards.length - 1) {
       setIndex(cards.length);
       setPhase("summary");

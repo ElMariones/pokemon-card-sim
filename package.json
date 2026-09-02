@@ -16,7 +16,7 @@
     "build": "npm run build --workspace=@pcs/web",
     "start": "npm run start --workspace=@pcs/web",
     "lint": "npm run lint --workspace=@pcs/web",
-    "typecheck": "tsc --build --verbose",
+    "typecheck": "tsc --build --verbose && tsc --noEmit -p apps/web/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate --config=packages/db/drizzle.config.ts",
