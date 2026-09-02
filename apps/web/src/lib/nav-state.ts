@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
@@ -11,8 +11,37 @@ import { usePathname, useSearchParams } from "next/navigation";
 export function useQueryState(key: string, defaultValue: string) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [restoredValue, setRestoredValue] = useState<string | null>(null);
 
-  const value = searchParams.get(key) ?? defaultValue;
+  const storageKey = `pcs:view:${pathname}:${key}`;
+
+  // A query string is shareable and always wins. When a page is opened without
+  // one, restore the last choice for that route so leaving Collection (or any
+  // other filtered page) does not quietly reset the player's workspace.
+  useEffect(() => {
+    const explicit = searchParams.get(key);
+    if (explicit !== null) {
+      localStorage.setItem(storageKey, explicit);
+      // Hydration from an external browser store is intentionally effect-driven.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRestoredValue(null);
+      return;
+    }
+
+    const saved = localStorage.getItem(storageKey);
+    if (saved === null || saved === "" || saved === defaultValue) {
+      setRestoredValue(null);
+      return;
+    }
+
+    setRestoredValue(saved);
+    const params = new URLSearchParams(window.location.search);
+    params.set(key, saved);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [defaultValue, key, pathname, searchParams, storageKey]);
+
+  const value = searchParams.get(key) ?? restoredValue ?? defaultValue;
 
   const setValue = useCallback(
     (next: string) => {
@@ -22,8 +51,14 @@ export function useQueryState(key: string, defaultValue: string) {
       // let the second call overwrite the first.
       const raw = typeof window !== "undefined" ? window.location.search : `?${searchParams.toString()}`;
       const params = new URLSearchParams(raw);
-      if (next === "" || next === defaultValue) params.delete(key);
-      else params.set(key, next);
+      if (next === "" || next === defaultValue) {
+        params.delete(key);
+        localStorage.removeItem(storageKey);
+      } else {
+        params.set(key, next);
+        localStorage.setItem(storageKey, next);
+      }
+      setRestoredValue(next === "" || next === defaultValue ? null : next);
       const qs = params.toString();
       const url = qs ? `${pathname}?${qs}` : pathname;
       // Next observes native history updates in the App Router. Calling
@@ -32,7 +67,7 @@ export function useQueryState(key: string, defaultValue: string) {
       // source of UI jank in otherwise client-only pages.
       if (typeof window !== "undefined") window.history.replaceState(null, "", url);
     },
-    [key, defaultValue, pathname, searchParams],
+    [key, defaultValue, pathname, searchParams, storageKey],
   );
 
   return [value, setValue] as const;

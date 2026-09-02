@@ -195,6 +195,7 @@ body {
   border-radius: inherit;
   pointer-events: none;
   opacity: calc(var(--sheen) * 0.5);
+  transition: opacity 360ms var(--ease-vitrine), background-position 720ms var(--ease-snap);
   background: linear-gradient(
     104deg,
     transparent 30%,
@@ -202,7 +203,219 @@ body {
     rgba(230, 220, 201, 0.01) 52%,
     transparent 66%
   );
+  background-size: 210% 100%;
+  background-position: 120% 0;
 }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .pane:hover::after {
+    opacity: calc(0.08 + var(--sheen) * 0.5);
+    background-position: -85% 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Persistent shell interactions. The Poké Ball is the one expressive piece
+   of chrome; the dock and cash tracker stay quieter around it.
+   -------------------------------------------------------------------------- */
+.pokeball-home {
+  position: relative;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  isolation: isolate;
+}
+.pokeball-home__ball {
+  position: relative;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.46));
+  transition: transform 520ms var(--ease-snap), filter 320ms var(--ease-vitrine);
+}
+.pokeball-home__halo,
+.pokeball-home__orbit {
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.pokeball-home__halo {
+  background: radial-gradient(circle, rgba(247, 205, 114, 0.32), transparent 68%);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 260ms ease, transform 420ms var(--ease-snap);
+}
+.pokeball-home__orbit {
+  border: 1px solid rgba(247, 205, 114, 0.34);
+  opacity: 0;
+  transform: scale(0.72) rotate(-40deg);
+  transition: opacity 220ms ease, transform 560ms var(--ease-snap);
+}
+.pokeball-home__orbit::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-brass-hot);
+  box-shadow: 0 0 9px var(--color-brass-hot);
+}
+.pokeball-home__spark {
+  position: absolute;
+  z-index: 3;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: white;
+  opacity: 0;
+  box-shadow: 0 0 8px white;
+}
+.pokeball-home__spark--one { top: 5px; right: 5px; }
+.pokeball-home__spark--two { right: 1px; bottom: 10px; transition-delay: 70ms; }
+.pokeball-home:hover .pokeball-home__ball,
+.pokeball-home:focus-visible .pokeball-home__ball {
+  transform: rotate(22deg) scale(1.08);
+  filter: drop-shadow(0 7px 12px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 9px rgba(247, 205, 114, 0.28));
+}
+.pokeball-home:hover .pokeball-home__halo,
+.pokeball-home:focus-visible .pokeball-home__halo,
+.pokeball-home[aria-current="page"] .pokeball-home__halo {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.pokeball-home:hover .pokeball-home__orbit,
+.pokeball-home:focus-visible .pokeball-home__orbit {
+  opacity: 1;
+  transform: scale(1.15) rotate(115deg);
+}
+.pokeball-home:hover .pokeball-home__spark,
+.pokeball-home:focus-visible .pokeball-home__spark {
+  animation: pokeball-spark 760ms var(--ease-snap) both;
+}
+@keyframes pokeball-spark {
+  0% { opacity: 0; transform: scale(0) translate(5px, 6px); }
+  45% { opacity: 1; transform: scale(1.5) translate(0, 0); }
+  100% { opacity: 0; transform: scale(0.5) translate(-4px, -6px); }
+}
+
+.app-dock {
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid color-mix(in oklab, var(--color-seam) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-vitrine) 76%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 8px 22px rgba(0,0,0,0.14);
+}
+.app-dock__item {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--color-manila-3);
+  border-radius: 6px;
+  transition: color 180ms ease, background 180ms ease;
+}
+.app-dock__motion {
+  display: flex;
+  height: 32px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.app-dock__item:hover { color: var(--color-manila); background: var(--color-vitrine-2); }
+.app-dock__item--active { color: var(--color-manila); background: var(--color-vitrine-3); }
+.app-dock__item--active .app-dock__motion { box-shadow: inset 0 -2px 0 var(--color-brass); }
+.app-dock__count { color: var(--color-manila-3); font-size: 0.58rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 940px) {
+  .app-dock__motion { padding-inline: 7px; }
+  .app-dock__motion svg { display: none; }
+  .app-dock__count { display: none; }
+}
+
+.cash-tracker {
+  position: relative;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: var(--radius-pane);
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.cash-tracker:hover,
+.cash-tracker--active {
+  background: var(--color-vitrine-3);
+  box-shadow: inset 0 0 0 1px var(--color-seam);
+  transform: translateY(-1px);
+}
+.cash-tracker__pulse {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-brass-hot);
+  opacity: 0;
+}
+.cash-tracker:hover .cash-tracker__pulse { animation: cash-pulse 1.4s ease-out infinite; }
+@keyframes cash-pulse {
+  0% { opacity: .9; box-shadow: 0 0 0 0 rgba(247, 205, 114, .45); }
+  100% { opacity: 0; box-shadow: 0 0 0 8px rgba(247, 205, 114, 0); }
+}
+
+/* React Bits-inspired effects, retuned for brass, glass and ledger ink. */
+.gradient-text {
+  display: inline-block;
+  color: transparent;
+  background-image: linear-gradient(100deg, var(--gradient-text-colors));
+  background-size: 260% 100%;
+  background-position: 0 50%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: gradient-text-shift var(--gradient-text-speed, 7s) ease-in-out infinite alternate;
+}
+@keyframes gradient-text-shift { to { background-position: 100% 50%; } }
+
+.border-glow {
+  --glow-x: 50%;
+  --glow-y: 50%;
+  position: relative;
+  border-radius: var(--border-glow-radius);
+  isolation: isolate;
+}
+.border-glow__inner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-seam);
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(30,39,57,.94), rgba(16,21,31,.98));
+}
+.border-glow__edge {
+  position: absolute;
+  z-index: 0;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: .18;
+  background: radial-gradient(150px circle at var(--glow-x) var(--glow-y), rgb(var(--border-glow-color) / .9), transparent 70%);
+  filter: blur(7px);
+  transition: opacity 320ms ease;
+}
+.border-glow:hover .border-glow__edge { opacity: .75; }
+.border-glow--animated .border-glow__edge { animation: border-glow-breathe 4.8s ease-in-out infinite; }
+@keyframes border-glow-breathe { 50% { opacity: .48; filter: blur(10px); } }
 
 /* --------------------------------------------------------------------------
    Foil. Three stacked layers, all driven by --foil (0..1) so one property

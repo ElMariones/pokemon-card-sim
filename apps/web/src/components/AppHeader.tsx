@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  Archive, BadgeCheck, BookOpen, PackageOpen, ScrollText, Store,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
 import { LevelBadge } from "./LevelBadge";
 import { usePlayer } from "./PlayerProvider";
+import { PokeballHome } from "./PokeballHome";
+import { AppNavDock, type AppNavItem } from "./AppNavDock";
 
 /**
  * The persistent shell header.
@@ -17,13 +22,13 @@ import { usePlayer } from "./PlayerProvider";
  * disappeared entirely and stranded the player on the page.
  */
 
-const NAV = [
-  { href: "/", label: "Packs" },
-  { href: "/collection", label: "Collection", badge: "collection" as const },
-  { href: "/market", label: "Market" },
-  { href: "/sealed", label: "Sealed" },
-  { href: "/grading", label: "Grading" },
-  { href: "/missions", label: "Missions" },
+const NAV: AppNavItem[] = [
+  { href: "/", label: "Packs", icon: PackageOpen },
+  { href: "/collection", label: "Collection", icon: BookOpen },
+  { href: "/market", label: "Market", icon: Store },
+  { href: "/sealed", label: "Sealed", icon: Archive },
+  { href: "/grading", label: "Grading", icon: BadgeCheck },
+  { href: "/missions", label: "Missions", icon: ScrollText },
 ];
 
 export function AppHeader() {
@@ -38,7 +43,7 @@ export function AppHeader() {
 
   return (
     <header className="border-seam/70 bg-ink/85 sticky top-0 z-40 border-b backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-3">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-5 py-2.5">
         <button
           type="button"
           onClick={() => {
@@ -56,44 +61,15 @@ export function AppHeader() {
         >
           ←
         </button>
-        <Link
-          href="/"
-          scroll={false}
-          className="hover:text-brass flex shrink-0 items-baseline gap-2 transition"
-        >
-          <span className="t-display text-[15px] tracking-tight">PokeCard</span>
-          <span className="text-manila-3 hidden text-[10px] tracking-[0.2em] uppercase lg:inline">
-            Collector Simulator
-          </span>
-        </Link>
+        <PokeballHome active={pathname === "/"} />
 
-        <nav
-          className="hidden flex-1 items-center gap-0.5 sm:flex"
-          aria-label="Main"
-        >
-          {NAV.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                scroll={false}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "relative rounded-pane px-3 py-1.5 text-xs tracking-wide uppercase transition",
-                  active
-                    ? "text-manila bg-vitrine-3"
-                    : "text-manila-3 hover:text-manila hover:bg-vitrine-2/60",
-                )}
-              >
-                {item.label}
-                {item.badge === "collection" && collectionCount > 0 && (
-                  <span className="text-manila-3 ml-1.5 tabular-nums">{collectionCount}</span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+        <AppNavDock
+          items={NAV.map((item) => ({
+            ...item,
+            count: item.href === "/collection" ? collectionCount : undefined,
+          }))}
+          isActive={isActive}
+        />
 
         <div className="ml-auto flex items-center gap-5">
           {progression && (
@@ -105,12 +81,22 @@ export function AppHeader() {
               xpToNext={progression.xpToNext}
             />
           )}
-          <div className="text-right">
+          <Link
+            href="/finances"
+            scroll={false}
+            aria-label={`Open money dashboard${player ? `, current cash ${money(player.cash)}` : ""}`}
+            aria-current={pathname.startsWith("/finances") ? "page" : undefined}
+            className={cn(
+              "cash-tracker text-right",
+              pathname.startsWith("/finances") && "cash-tracker--active",
+            )}
+          >
             <p className="t-eyebrow text-manila-3 leading-none">Cash</p>
             <p className="t-num text-brass mt-0.5 leading-none tabular-nums">
               {player ? money(player.cash) : "—"}
             </p>
-          </div>
+            <span className="cash-tracker__pulse" aria-hidden="true" />
+          </Link>
 
           <button
             type="button"
@@ -127,7 +113,7 @@ export function AppHeader() {
       {open && (
         <nav className="border-seam/70 border-t sm:hidden" aria-label="Main">
           <ul className="mx-auto max-w-7xl px-3 py-2">
-            {NAV.map((item) => (
+            {[...NAV, { href: "/finances", label: "Money", icon: ScrollText }].map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}

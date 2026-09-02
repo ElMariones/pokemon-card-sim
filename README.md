@@ -132,6 +132,8 @@ For the longer product rationale, data model, balance philosophy, and roadmap, r
 
 Catalogue records and image URLs come from [Pokémon TCG API](https://pokemontcg.io) and [PokemonTCG/pokemon-tcg-data](https://github.com/PokemonTCG/pokemon-tcg-data). Market inputs are TCGplayer and Cardmarket figures surfaced by the API. Images are accessed through an asset indirection so the application can move to its own storage later without changing gameplay code.
 
+The Poké Ball navigation icon is adapted from [Andreuvv's Wikimedia Commons SVG](https://commons.wikimedia.org/wiki/File:Pok%C3%A9_Ball_icon.svg), licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
 This is a non-commercial fan project. Pokémon and all card content are © Nintendo / Creatures Inc. / GAME FREAK inc. / The Pokémon Company. No real currency is used, and the simulator does not provide real-world card-value advice or predictions.
 
 ## Installation
