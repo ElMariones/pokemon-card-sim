@@ -66,6 +66,14 @@ npm run db:reset && npm run db:push && npm run data:all
 
 Neon has no such restriction, so this is a development-only hazard.
 
+### Getting the result to production
+
+The importers only ever write to PGlite. `npm run db:sync-supabase` pushes the
+local state to the linked Supabase project through the authenticated CLI —
+pending migrations first (made idempotent, since that remote has drifted), then
+card prices, pack prices and templates. It is additive and safe to re-run;
+`--schema` limits it to DDL and `--dry-run` prints without writing.
+
 Related: `getDb()` caches the connection on `globalThis`, not in a module
 variable. Importing this package through both `@pcs/db` and a relative path
 yields two module instances, and Next.js hot reload makes more — each would

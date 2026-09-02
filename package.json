@@ -34,7 +34,8 @@
     "data:price-packs": "tsx scripts/simulate/price-packs.ts",
     "db:rebuild": "npm run db:reset && npm run db:push && npm run data:sets && npm run data:cards && npm run data:apply-prices && npm run data:price-packs && npm run data:pack-prices",
     "data:tcgcsv": "tsx scripts/import/fetch-tcgcsv.ts",
-    "data:pack-prices": "tsx scripts/import/apply-pack-prices.ts"
+    "data:pack-prices": "tsx scripts/import/apply-pack-prices.ts",
+    "db:sync-supabase": "tsx scripts/import/sync-supabase.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
