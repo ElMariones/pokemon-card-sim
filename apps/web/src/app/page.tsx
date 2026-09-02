@@ -131,8 +131,8 @@ export default function PacksPage() {
           <div className="mb-6">
             <h1 className="t-display text-2xl tracking-tight">Choose a pack</h1>
             <p className="text-manila-2 mt-1 text-sm">
-              {sets.length} sets priced and ready. Pack prices come from what the cards inside
-              are actually worth today.
+              {sets.length} sets priced and ready. A pack costs what the sealed pack trades
+              for today — which is not the same as what the cards inside add up to.
             </p>
           </div>
 
