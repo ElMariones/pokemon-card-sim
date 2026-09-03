@@ -34,6 +34,9 @@
       "@pcs/economy-engine": [
         "./packages/economy-engine/src/index.ts"
       ],
+      "@pcs/minigame-engine": [
+        "./packages/minigame-engine/src/index.ts"
+      ],
       "@pcs/card-data": [
         "./packages/card-data/src/index.ts"
       ],

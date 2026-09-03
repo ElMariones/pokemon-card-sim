@@ -12,6 +12,7 @@
     "@pcs/card-data": "*",
     "@pcs/db": "*",
     "@pcs/economy-engine": "*",
+    "@pcs/minigame-engine": "*",
     "@pcs/pack-engine": "*",
     "@pcs/shared": "*",
     "clsx": "^2.1.1",

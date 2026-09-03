@@ -16,6 +16,7 @@ export default defineConfig({
       '@pcs/db': r('./packages/db/src/index.ts'),
       '@pcs/pack-engine': r('./packages/pack-engine/src/index.ts'),
       '@pcs/economy-engine': r('./packages/economy-engine/src/index.ts'),
+      '@pcs/minigame-engine': r('./packages/minigame-engine/src/index.ts'),
       '@pcs/card-data': r('./packages/card-data/src/index.ts'),
     },
   },

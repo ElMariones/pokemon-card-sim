@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     "@pcs/card-data",
     "@pcs/pack-engine",
     "@pcs/economy-engine",
+    "@pcs/minigame-engine",
   ],
 };
 
