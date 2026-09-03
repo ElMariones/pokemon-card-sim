@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { getDb } from '@pcs/db';
 import {
   sets, cards, openings, openingCards, inventoryItems, packTemplates, pullTables, grades,
@@ -10,8 +10,8 @@ import {
   expectedPackValue, type EngineCard,
 } from '@pcs/pack-engine';
 import {
-  applyTransaction, InsufficientFundsError, dealerBuyOffer, derivePackPrice,
-  computePrice, rollPackCondition, mulberry32, gradedValue,
+  applyTransaction, applyRepeatedTransactionInTx, dealerBuyOffer,
+  derivePackPrice, computePrice, rollPackCondition, mulberry32, gradedValue,
 } from '@pcs/economy-engine';
 import { grantXp, grantXpMany } from './progression-service';
 
@@ -38,7 +38,8 @@ async function loadEngineSet(setId: string) {
   const rows = await db
     .select({
       id: cards.id, number: cards.number, rarityTier: cards.rarityTier,
-      price: cards.marketBasePrice,
+      price: cards.marketBasePrice, name: cards.name,
+      imageSmall: cards.imageSmall, imageLarge: cards.imageLarge,
     })
     .from(cards)
     .where(eq(cards.setId, setId));
@@ -52,7 +53,11 @@ async function loadEngineSet(setId: string) {
   }));
 
   const prices = new Map(rows.map((r) => [r.id, r.price]));
-  return { set, engineCards, prices };
+  // The display metadata comes back with the pool rather than in a second
+  // query keyed on what was pulled: the pool is already in memory, and a
+  // fifty-pack rip would otherwise issue that lookup fifty times.
+  const meta = new Map(rows.map((r) => [r.id, r]));
+  return { set, engineCards, prices, meta };
 }
 
 /**
@@ -79,6 +84,16 @@ async function loadEngineSet(setId: string) {
 async function expectedContentsValue(setId: string): Promise<Cents> {
   const { set, engineCards, prices } = await loadEngineSet(setId);
   const { template, tables } = deriveTemplate(set, engineCards);
+  return expectedValueOf(template, tables, engineCards, prices);
+}
+
+/** The same figure, for a caller that has already loaded the set. */
+function expectedValueOf(
+  template: ReturnType<typeof deriveTemplate>['template'],
+  tables: ReturnType<typeof deriveTemplate>['tables'],
+  engineCards: readonly EngineCard[],
+  prices: Map<string, number | null>,
+): Cents {
   const value = expectedPackValue(
     template,
     tables,
@@ -223,173 +238,190 @@ export interface OpenPackResult {
 }
 
 /**
- * Buy and open one pack, atomically.
+ * Buy and open packs of one set, atomically.
  *
  * The seed is generated here with node:crypto and never leaves the server; only
  * its hash is stored, so a past opening can be audited but a future one cannot
  * be predicted.
+ *
+ * A rip of fifty packs is fifty purchases and fifty ledger rows, but it is one
+ * read of the set, one derived template, one balance lock and one write. The
+ * previous shape re-read the whole card pool and re-derived the template once
+ * per pack, which is why ten was the practical ceiling.
+ *
+ * How many packs the player can afford is decided inside the transaction,
+ * under the same lock that spends the money — so a batch either opens `count`
+ * packs or opens the largest affordable prefix, and never charges for a pack
+ * it did not deal.
  */
-export async function buyAndOpenPack(userId: string, setId: string): Promise<OpenPackResult> {
+export async function buyAndOpenPacks(
+  userId: string,
+  setId: string,
+  count: number,
+): Promise<OpenPackResult[]> {
+  if (count < 1) return [];
+
   const db = await getDb();
-  const { set, engineCards, prices } = await loadEngineSet(setId);
+  const { set, engineCards, prices, meta } = await loadEngineSet(setId);
   const { template, tables } = deriveTemplate(set, engineCards);
 
   // Templates and their prices are imported once, not regenerated on every
   // click. The fallback keeps a freshly imported catalogue playable before
   // `data:price-packs` has run.
   const storedPrice = await getStoredPackPrice(setId);
-  const cost = storedPrice ?? derivePackPrice(await expectedContentsValue(setId));
+  const cost = storedPrice ?? derivePackPrice(expectedValueOf(template, tables, engineCards, prices));
   if (storedPrice === null) await ensureTemplatePersisted(template, tables, cost);
 
-  // Charge first. If this throws, nothing else has happened yet.
-  let balanceAfter: Cents;
-  try {
-    const res = await applyTransaction(db as never, {
-      userId,
-      type: 'pack_purchase',
-      amount: cents(-cost),
-      itemType: 'pack_template',
-      itemId: template.id,
-      metadata: { setId, templateVersion: template.version },
-    });
-    balanceAfter = res.balanceAfter;
-  } catch (err) {
-    if (err instanceof InsufficientFundsError) {
-      throw new GameError('Not enough cash for this pack', 'insufficient_funds');
-    }
-    throw err;
-  }
+  // Which of this set's cards the player already holds, read once for the
+  // whole batch. Cards gained earlier in the same batch are tracked in memory
+  // below, so the album sticker still lands on exactly the first copy.
+  const ownedRows = await db
+    .select({ cardId: inventoryItems.cardId })
+    .from(inventoryItems)
+    .innerJoin(cards, eq(cards.id, inventoryItems.cardId))
+    .where(
+      and(
+        eq(inventoryItems.userId, userId),
+        eq(cards.setId, setId),
+        eq(inventoryItems.status, 'owned'),
+      ),
+    );
+  const seen = new Set(ownedRows.map((r) => r.cardId as string));
 
-  const seed = createSeed();
-  const result = simulatePack({ template, tables, cards: engineCards, seed });
-
-  const openingId = randomUUID();
   const rng = mulberry32(Math.floor(Math.random() * 2 ** 31));
 
-  const pulledIds = new Set(result.cards.map((c) => c.cardId));
-  const [metadataRows, ownedRows] = await Promise.all([
-    db
-        .select({
-          id: cards.id, name: cards.name, number: cards.number,
-          imageSmall: cards.imageSmall, imageLarge: cards.imageLarge,
-        })
-        .from(cards)
-        .where(inArray(cards.id, [...pulledIds])),
-    // Which of these cards the player already had must be read before the
-    // pack is written. It is independent from the card metadata, so avoid a
-    // second serial database round-trip.
-    db
-      .select({ cardId: inventoryItems.cardId })
-      .from(inventoryItems)
-      .where(
-        and(
-          eq(inventoryItems.userId, userId),
-          inArray(inventoryItems.cardId, [...pulledIds]),
-          eq(inventoryItems.status, 'owned'),
-        ),
-      ),
-  ]);
-  const meta = new Map(metadataRows.map((r) => [r.id, r]));
-  const ownedBefore = new Set(ownedRows.map((r) => r.cardId as string));
-
-  const opened: OpenedCard[] = [];
-  const inventoryRows: (typeof inventoryItems.$inferInsert)[] = [];
-  const openingCardRows: (typeof openingCards.$inferInsert)[] = [];
-  const newlySeen = new Set<string>();
-  let totalValue = 0;
-
-  // Build the full result first, then persist each table in a single batch.
-  // The previous per-card insert loop made a normal ten-card opening issue
-  // twenty database commands before it could render the first card.
-  for (const pulled of result.cards) {
-    const m = meta.get(pulled.cardId);
-    const condition = rollPackCondition(rng);
-    const base = prices.get(pulled.cardId) ?? 0;
-    const value = computePrice(cents(base), { condition });
-    totalValue += value;
-
-    const inventoryId = randomUUID();
-    // The same card can theoretically occupy two different pack slots. Only
-    // the first copy advances the album, so only it earns the sticker.
-    const isNew = !ownedBefore.has(pulled.cardId) && !newlySeen.has(pulled.cardId);
-    newlySeen.add(pulled.cardId);
-    inventoryRows.push({
-      id: inventoryId,
-      userId,
-      type: 'card',
-      cardId: pulled.cardId,
-      quantity: 1,
-      condition,
-      acquisitionSource: 'pack',
-      acquisitionPrice: cents(0),
-      status: 'owned',
-    });
-    openingCardRows.push({
-      id: randomUUID(),
-      openingId,
-      cardId: pulled.cardId,
-      inventoryItemId: inventoryId,
-      slotName: pulled.slotName,
-      slotIndex: pulled.slotIndex,
-      valueAtPull: value,
-    });
-    opened.push({
-      cardId: pulled.cardId,
-      name: m?.name ?? pulled.cardId,
-      number: m?.number ?? '',
-      rarityTier: pulled.rarityTier,
-      imageSmall: m?.imageSmall ?? null,
-      imageLarge: m?.imageLarge ?? null,
-      slotName: pulled.slotName,
-      isHit: pulled.isHit,
-      isReverse: pulled.isReverse,
-      isNew,
-      condition,
-      value,
-      inventoryId,
-    });
-  }
-
-  // The PGlite/Neon union exposes incompatible transaction generics; the
-  // driver-independent transaction surface is intentionally structural here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await db.transaction(async (tx: any) => {
-    await tx.insert(openings).values({
-      id: openingId,
+  const results = await db.transaction(async (tx: any) => {
+    // Charge first, and let the ledger decide how many of the requested packs
+    // the balance covers. It reads and locks the row once to answer that, so
+    // nothing here needs its own view of the money. Simulation and the writes
+    // below share this transaction: if any of them throws, the charges roll
+    // back with them.
+    const charges = await applyRepeatedTransactionInTx(
+      tx,
       userId,
-      packTemplateId: template.id,
-      templateVersion: template.version,
-      cost,
-      rngSeedHash: result.seedHash,
-      totalValue: cents(totalValue),
-    });
+      {
+        type: 'pack_purchase',
+        amount: cents(-cost),
+        itemType: 'pack_template',
+        itemId: template.id,
+        metadata: { setId, templateVersion: template.version },
+      },
+      count,
+    );
+    const dealing = charges.length;
+    if (dealing < 1) throw new GameError('Not enough cash for this pack', 'insufficient_funds');
+
+    const openingRows: (typeof openings.$inferInsert)[] = [];
+    const inventoryRows: (typeof inventoryItems.$inferInsert)[] = [];
+    const openingCardRows: (typeof openingCards.$inferInsert)[] = [];
+    const perPack: { openingId: string; seedHash: string; totalValue: number; cards: OpenedCard[] }[] = [];
+
+    for (let i = 0; i < dealing; i++) {
+      const seed = createSeed();
+      const result = simulatePack({ template, tables, cards: engineCards, seed });
+      const openingId = randomUUID();
+      const opened: OpenedCard[] = [];
+      let totalValue = 0;
+
+      for (const pulled of result.cards) {
+        const m = meta.get(pulled.cardId);
+        const condition = rollPackCondition(rng);
+        const base = prices.get(pulled.cardId) ?? 0;
+        const value = computePrice(cents(base), { condition });
+        totalValue += value;
+
+        const inventoryId = randomUUID();
+        // The same card can occupy two slots, in one pack or across the
+        // batch. Only the first copy advances the album, so only it earns
+        // the sticker.
+        const isNew = !seen.has(pulled.cardId);
+        seen.add(pulled.cardId);
+
+        inventoryRows.push({
+          id: inventoryId,
+          userId,
+          type: 'card',
+          cardId: pulled.cardId,
+          quantity: 1,
+          condition,
+          acquisitionSource: 'pack',
+          acquisitionPrice: cents(0),
+          status: 'owned',
+        });
+        openingCardRows.push({
+          id: randomUUID(),
+          openingId,
+          cardId: pulled.cardId,
+          inventoryItemId: inventoryId,
+          slotName: pulled.slotName,
+          slotIndex: pulled.slotIndex,
+          valueAtPull: value,
+        });
+        opened.push({
+          cardId: pulled.cardId,
+          name: m?.name ?? pulled.cardId,
+          number: m?.number ?? '',
+          rarityTier: pulled.rarityTier,
+          imageSmall: m?.imageSmall ?? null,
+          imageLarge: m?.imageLarge ?? null,
+          slotName: pulled.slotName,
+          isHit: pulled.isHit,
+          isReverse: pulled.isReverse,
+          isNew,
+          condition,
+          value,
+          inventoryId,
+        });
+      }
+
+      openingRows.push({
+        id: openingId,
+        userId,
+        packTemplateId: template.id,
+        templateVersion: template.version,
+        cost,
+        rngSeedHash: result.seedHash,
+        totalValue: cents(totalValue),
+      });
+      perPack.push({ openingId, seedHash: result.seedHash, totalValue, cards: opened });
+    }
+
+    await tx.insert(openings).values(openingRows);
     await tx.insert(inventoryItems).values(inventoryRows);
     await tx.insert(openingCards).values(openingCardRows);
+
+    return perPack.map((pack, i) => ({
+      openingId: pack.openingId,
+      setId,
+      setName: set.name,
+      cost,
+      balanceAfter: charges[i]!.balanceAfter,
+      totalValue: cents(pack.totalValue),
+      seedHash: pack.seedHash,
+      confidence: template.confidence,
+      cards: pack.cards,
+    } satisfies OpenPackResult));
   });
 
-  // XP is awarded after the opening is committed, so a failed write cannot
-  // leave a player levelled up for a pack they never received.
-  const firstTime = [...pulledIds].filter((id) => !ownedBefore.has(id)).length;
-
+  // XP is awarded after the openings are committed, so a failed write cannot
+  // leave a player levelled up for packs they never received.
+  const newCards = results.reduce((n, r) => n + r.cards.filter((c) => c.isNew).length, 0);
+  const hits = results.reduce((n, r) => n + r.cards.filter((c) => c.isHit).length, 0);
   await grantXpMany(userId, [
-    { reason: 'pack_opened', count: 1 },
-    ...(firstTime > 0 ? [{ reason: 'new_card' as const, count: firstTime }] : []),
-    ...(opened.some((c) => c.isHit)
-      ? [{ reason: 'hit_pulled' as const, count: opened.filter((c) => c.isHit).length }]
-      : []),
+    { reason: 'pack_opened', count: results.length },
+    { reason: 'new_card', count: newCards },
+    { reason: 'hit_pulled', count: hits },
   ]);
 
-  return {
-    openingId,
-    setId,
-    setName: set.name,
-    cost,
-    balanceAfter,
-    totalValue: cents(totalValue),
-    seedHash: result.seedHash,
-    confidence: template.confidence,
-    cards: opened,
-  };
+  return results;
+}
+
+/** Buy and open a single pack. */
+export async function buyAndOpenPack(userId: string, setId: string): Promise<OpenPackResult> {
+  const [result] = await buyAndOpenPacks(userId, setId, 1);
+  if (!result) throw new GameError('Not enough cash for this pack', 'insufficient_funds');
+  return result;
 }
 
 /** Sell one owned card to the NPC dealer at the buylist spread. */

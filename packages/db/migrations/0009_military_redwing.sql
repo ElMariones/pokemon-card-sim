@@ -1,0 +1,1 @@
+CREATE INDEX "cards_set_price_idx" ON "cards" USING btree ("set_id","market_base_price" desc);

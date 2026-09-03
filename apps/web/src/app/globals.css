@@ -868,3 +868,326 @@ body {
   .pack-sheen { animation: none; opacity: .5; }
   .shelf-skeleton { animation: none; opacity: .6; }
 }
+
+/* --------------------------------------------------------------------------
+   THE SHELF
+
+   A shelf listing is a booster hanging on a peg with its price tag beside it.
+   Everything here is drawn in CSS rather than as vector: the shop mounts two
+   dozen packs at once, and the full PackWrapper — two SVGs, thirty-five defs
+   and a mask apiece — cost 1,680 def nodes and 7ms per forced reflow before
+   the player had touched anything. At 92px the tear geometry is invisible
+   anyway. PackWrapper is still what opens.
+   -------------------------------------------------------------------------- */
+.pack-thumb {
+  position: relative;
+  aspect-ratio: 200 / 330;
+  overflow: hidden;
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      152deg,
+      rgba(111, 230, 255, 0.15) 0%,
+      rgba(169, 140, 255, 0.12) 34%,
+      rgba(255, 126, 194, 0.09) 62%,
+      rgba(255, 215, 107, 0.13) 100%
+    ),
+    linear-gradient(158deg, var(--pack-a, #2b3a63), var(--pack-b, #16203a) 56%, var(--pack-c, #0b1120));
+  /* The two inset side shadows are the whole trick: they round the foil, so
+     the pack reads as a sleeve rather than a printed rectangle. */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.17),
+    inset 9px 0 15px -10px rgba(0, 0, 0, 0.9),
+    inset -9px 0 15px -10px rgba(0, 0, 0, 0.9),
+    inset 0 -14px 22px -16px rgba(0, 0, 0, 0.75),
+    0 12px 22px -12px rgba(0, 0, 0, 0.85);
+  transition:
+    transform 300ms var(--ease-snap),
+    box-shadow 300ms var(--ease-snap);
+}
+
+.pack-thumb__crimp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10.5%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.36) 0 1.5px, rgba(255, 255, 255, 0.09) 1.5px 3px),
+    var(--pack-c, #0b1120);
+}
+.pack-thumb__crimp--top {
+  top: 0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+.pack-thumb__crimp--bottom {
+  bottom: 0;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+/* The punched hang hole. It is the detail that says "peg", not "playing card". */
+.pack-thumb__crimp--top::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 24%;
+  height: 34%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.pack-thumb__logo {
+  position: absolute;
+  left: 8%;
+  top: 27%;
+  width: 84%;
+  height: 36%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+
+.pack-thumb__sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    118deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.17) 36%,
+    rgba(255, 255, 255, 0.02) 45%,
+    transparent 60%
+  );
+  background-size: 240% 100%;
+  background-position: 42% 0;
+  opacity: calc(0.45 + var(--sheen) * 0.35);
+}
+
+/* A pack coming off the peg. Held for as long as the purchase is in flight
+   rather than played once on click: the shop answers in well under a second,
+   and a one-shot animation was always over before the result screen replaced
+   it — an animation nobody could ever see. */
+.pack-thumb--pulling {
+  transform: translateY(-11px) rotate(-2.4deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(247, 205, 114, 0.4),
+    inset 9px 0 15px -10px rgba(0, 0, 0, 0.9),
+    inset -9px 0 15px -10px rgba(0, 0, 0, 0.9),
+    0 24px 38px -14px rgba(0, 0, 0, 0.95),
+    0 0 22px -4px rgba(247, 205, 114, 0.45);
+}
+
+.shelf-card {
+  position: relative;
+  overflow: hidden;
+  /* Off-screen listings cost nothing to style, lay out or paint. The shelf
+     starts at 24 and grows by 24 on every "Show more", so this is what keeps
+     scrolling flat as the page gets longer. The intrinsic size is the real
+     rendered height, so the scrollbar does not jump as rows come into view. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 266px;
+  animation: shelf-arrive 380ms var(--ease-snap) backwards;
+}
+@keyframes shelf-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.shelf-card:nth-child(2) { animation-delay: 40ms; }
+.shelf-card:nth-child(3) { animation-delay: 80ms; }
+.shelf-card:nth-child(4) { animation-delay: 120ms; }
+.shelf-card:nth-child(5) { animation-delay: 160ms; }
+.shelf-card:nth-child(n + 6) { animation-delay: 200ms; }
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .shelf-card:hover .pack-thumb {
+    transform: translateY(-7px) rotate(-1.4deg);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+      inset 9px 0 15px -10px rgba(0, 0, 0, 0.9),
+      inset -9px 0 15px -10px rgba(0, 0, 0, 0.9),
+      inset 0 -14px 22px -16px rgba(0, 0, 0, 0.75),
+      0 22px 34px -14px rgba(0, 0, 0, 0.95);
+  }
+  .shelf-card:hover .pack-thumb__sheen {
+    animation: pack-sweep 900ms var(--ease-vitrine);
+  }
+}
+@keyframes pack-sweep {
+  from { background-position: -70% 0; }
+  to { background-position: 170% 0; }
+}
+
+/* --------------------------------------------------------------------------
+   The chase tag. The one loud thing on the shelf: what a pack of this set can
+   actually pay out, with the card itself slipped in behind the label.
+   -------------------------------------------------------------------------- */
+.chase-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.65rem 0.4rem 0.4rem;
+  border: 1px solid color-mix(in oklab, var(--color-brass) 26%, var(--color-seam));
+  border-radius: 5px;
+  background:
+    linear-gradient(102deg, color-mix(in oklab, var(--color-brass) 11%, transparent), transparent 58%),
+    color-mix(in oklab, var(--color-vitrine-3) 82%, var(--color-ink));
+  transition: border-color 220ms ease, background 220ms ease;
+}
+.shelf-card:hover .chase-tag {
+  border-color: color-mix(in oklab, var(--color-brass) 46%, var(--color-seam));
+}
+.chase-tag__art {
+  width: 34px;
+  height: 47px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 2px;
+  transform: rotate(-3.5deg);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  /* The thumbnail is 34px wide; without the lift the artwork reads as a dark
+     smudge next to brass type. */
+  filter: brightness(1.12) saturate(1.06);
+  transition: transform 280ms var(--ease-snap);
+}
+.shelf-card:hover .chase-tag__art {
+  transform: rotate(-1deg) scale(1.06);
+}
+.chase-tag__slot {
+  display: grid;
+  width: 34px;
+  height: 47px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 2px;
+  background: var(--color-vitrine);
+  box-shadow: inset 0 0 0 1px var(--color-seam);
+}
+
+/* --------------------------------------------------------------------------
+   The till: how many packs, and what that costs.
+   -------------------------------------------------------------------------- */
+.qty-rail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--color-ink) 58%, var(--color-vitrine-3));
+  box-shadow: inset 0 0 0 1px var(--color-seam);
+}
+.qty-chip {
+  position: relative;
+  /* Own stacking context, so the brass mark can sit under the digit without
+     falling behind the rail's own background. */
+  isolation: isolate;
+  min-width: 32px;
+  height: 27px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-manila-3);
+  transition: color 160ms ease;
+}
+.qty-chip:hover {
+  color: var(--color-manila);
+}
+.qty-chip[aria-pressed="true"] {
+  color: var(--color-ink);
+}
+.qty-chip__mark {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--color-brass-hot), var(--color-brass));
+  box-shadow: 0 2px 7px -2px rgba(211, 160, 60, 0.7);
+}
+.qty-chip__label {
+  position: relative;
+  z-index: 1;
+}
+.qty-input {
+  width: 54px;
+  height: 27px;
+  border-radius: 5px;
+  background: color-mix(in oklab, var(--color-vitrine-3) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-seam) 80%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--color-manila);
+  outline: none;
+  transition: box-shadow 160ms ease, color 160ms ease;
+}
+.qty-input::placeholder {
+  color: var(--color-manila-3);
+}
+.qty-input:focus {
+  box-shadow: inset 0 0 0 1px var(--color-brass);
+}
+/* The spinners fight the rail's geometry and the chips already do that job. */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.qty-input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.buy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 33px;
+  padding: 0 0.95rem;
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--color-brass-hot), var(--color-brass));
+  color: var(--color-ink);
+  box-shadow: 0 6px 16px -8px rgba(211, 160, 60, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition:
+    transform 180ms var(--ease-snap),
+    box-shadow 180ms var(--ease-snap),
+    filter 180ms ease;
+}
+.buy-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 22px -8px rgba(211, 160, 60, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.buy-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.975);
+}
+.buy-button:disabled {
+  background: none;
+  color: var(--color-manila-3);
+  box-shadow: inset 0 0 0 1px var(--color-seam);
+  cursor: not-allowed;
+}
+/* The cart nudges forward as you reach for it — the only motion on the
+   control, so the press still reads as the event. */
+.buy-button__cart {
+  transition: transform 220ms var(--ease-snap);
+}
+.buy-button:hover:not(:disabled) .buy-button__cart {
+  transform: translateX(2px) rotate(-6deg);
+}
+
+.shelf-toolbar {
+  position: sticky;
+  /* Clear the shell header, whose height changes with the breakpoint — see
+     AppHeader, which measures itself into --app-header-h. */
+  top: calc(var(--app-header-h, 67px) + 0.5rem);
+  z-index: 20;
+  backdrop-filter: blur(10px);
+  background: color-mix(in oklab, var(--color-vitrine) 88%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-card {
+    animation: none;
+  }
+}

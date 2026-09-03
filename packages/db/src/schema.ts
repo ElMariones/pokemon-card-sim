@@ -1,7 +1,7 @@
 import {
   pgTable, text, integer, timestamp, jsonb, boolean, index, uniqueIndex, primaryKey,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, desc } from 'drizzle-orm';
 
 /**
  * Conventions
@@ -68,6 +68,11 @@ export const cards = pgTable('cards', {
   index('cards_rarity_idx').on(t.rarityTier),
   index('cards_name_idx').on(t.name),
   index('cards_set_rarity_idx').on(t.setId, t.rarityTier),
+  // The shop's "biggest pull" tag asks for the top-priced card of every set at
+  // once (`distinct on (set_id) ... order by set_id, market_base_price desc`).
+  // On set_id alone that reads every card of all 174 sets and sorts them; this
+  // lets it walk the index and stop at the first row per set.
+  index('cards_set_price_idx').on(t.setId, desc(t.marketBasePrice)),
   uniqueIndex('cards_set_number_uq').on(t.setId, t.number),
 ]);
 

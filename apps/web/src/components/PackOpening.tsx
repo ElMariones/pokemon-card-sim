@@ -44,6 +44,9 @@ export interface OpeningView {
 
 type Phase = "sealed" | "tearing" | "revealing" | "summary";
 
+/** Result tiles mounted before the player asks for the rest. */
+const GRID_PAGE = 48;
+
 type PackOpeningProps = {
   opening: OpeningView;
   /**
@@ -193,6 +196,22 @@ function PackOpeningSession({
   }, [phase, revealOrAdvance, skip, startTear]);
 
   const profit = opening.totalValue - opening.cost;
+
+  /**
+   * A bundle's results are ordered by what they are worth, biggest first.
+   *
+   * Pack order is the right order for one pack — it is the order you pulled
+   * them in. Fifty packs is 450 cards and no one reads them in sequence; what
+   * you want to know is what the rip was worth, and that answer is buried at a
+   * random depth unless the pile is sorted.
+   */
+  const shown = useMemo(
+    () => (bundle ? [...cards].sort((a, b) => b.value - a.value) : cards),
+    [bundle, cards],
+  );
+  const [gridLimit, setGridLimit] = useState(GRID_PAGE);
+  const hits = useMemo(() => cards.filter((c) => c.isHit).length, [cards]);
+  const fresh = useMemo(() => cards.filter((c) => c.isNew).length, [cards]);
 
   const slidingData = useMemo(
     () =>
@@ -409,7 +428,23 @@ function PackOpeningSession({
                 {bundle ? `${packCount} packs opened` : "Pack results"}
               </h2>
             </div>
-            <dl className="flex gap-6 text-right">
+            <dl className="flex flex-wrap gap-6 text-right">
+              {bundle && (
+                <>
+                  <div>
+                    <dt className="t-eyebrow text-manila-3">Cards</dt>
+                    <dd className="t-num tabular-nums">{cards.length}</dd>
+                  </div>
+                  <div>
+                    <dt className="t-eyebrow text-manila-3">Hits</dt>
+                    <dd className="t-num tabular-nums">{hits}</dd>
+                  </div>
+                  <div>
+                    <dt className="t-eyebrow text-manila-3">New</dt>
+                    <dd className="t-num tabular-nums">{fresh}</dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt className="t-eyebrow text-manila-3">Cost</dt>
                 <dd className="t-num tabular-nums">{money(opening.cost)}</dd>
@@ -451,7 +486,7 @@ function PackOpeningSession({
             }}
             className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
           >
-            {cards.map((c) => (
+            {shown.slice(0, gridLimit).map((c) => (
               <motion.li
                 key={c.inventoryId}
                 variants={{
@@ -483,6 +518,17 @@ function PackOpeningSession({
               </motion.li>
             ))}
           </motion.ul>
+
+          {/* 450 tiles is 450 card images. The rest arrive on request. */}
+          {gridLimit < shown.length && (
+            <button
+              type="button"
+              onClick={() => setGridLimit((n) => n + GRID_PAGE)}
+              className="ring-seam text-manila-2 hover:text-manila hover:ring-brass mx-auto mt-6 block rounded-pane px-5 py-2.5 text-sm ring-1 transition"
+            >
+              Show more — {shown.length - gridLimit} cards left
+            </button>
+          )}
 
           <footer className="border-seam mt-8 border-t pt-5">
             <p className="text-manila-3 max-w-lg text-[11px] leading-relaxed">

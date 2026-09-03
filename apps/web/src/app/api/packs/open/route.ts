@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
 import { requirePlayer } from '@/server/session';
-import { buyAndOpenPack, GameError } from '@/server/game';
+import { buyAndOpenPacks, GameError } from '@/server/game';
 
 export const dynamic = 'force-dynamic';
 
-/** A ten-pack is the biggest single purchase the shop offers. */
-const MAX_PACKS = 10;
+/** The biggest single rip the shop offers. */
+const MAX_PACKS = 50;
 
 /**
- * Buy and open one pack, or up to ten.
+ * Buy and open packs of one set.
  *
  * The client sends a set id and how many packs it wants. The server charges,
- * generates the seed, simulates each pack and writes the inventory. The client
- * is told what it got; it never gets to say (DESIGN.md section 22).
+ * generates the seeds, simulates each pack and writes the inventory. The
+ * client is told what it got; it never gets to say (DESIGN.md section 22).
  *
- * Packs are opened one at a time rather than in a single transaction: each is
- * its own purchase with its own ledger row, so running out of cash on the
- * seventh keeps the first six.
+ * Every pack is its own purchase with its own ledger row, and how many are
+ * affordable is settled under the same lock that spends the money — so asking
+ * for fifty with cash for six opens six and charges for six.
  */
 export async function POST(request: Request) {
   const player = await requirePlayer();
@@ -41,18 +41,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `count must be 1 to ${MAX_PACKS}` }, { status: 400 });
   }
 
-  const openings: Awaited<ReturnType<typeof buyAndOpenPack>>[] = [];
+  let openings: Awaited<ReturnType<typeof buyAndOpenPacks>>;
   try {
-    for (let i = 0; i < wanted; i++) {
-      openings.push(await buyAndOpenPack(player.id, setId));
-    }
+    openings = await buyAndOpenPacks(player.id, setId, wanted);
   } catch (err) {
     if (err instanceof GameError) {
-      // Whatever was already opened is the player's; report it alongside the
-      // reason the rest did not happen.
-      if (openings.length > 0) {
-        return NextResponse.json({ ...openings[0]!, openings, stoppedAfter: openings.length, error: err.message, code: err.code });
-      }
       const status = err.code === 'insufficient_funds' ? 402 : 400;
       return NextResponse.json({ error: err.message, code: err.code }, { status });
     }
@@ -60,6 +53,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not open pack' }, { status: 500 });
   }
 
-  // A single pack keeps its original shape; a multi-pack adds the list.
-  return NextResponse.json(wanted === 1 ? openings[0] : { ...openings[0]!, openings });
+  const first = openings[0]!;
+  // A single pack keeps its original shape; a multi-pack adds the list, and
+  // says so when cash ran out before the count did.
+  if (wanted === 1) return NextResponse.json(first);
+  return NextResponse.json({
+    ...first,
+    openings,
+    ...(openings.length < wanted
+      ? { stoppedAfter: openings.length, error: 'Ran out of cash', code: 'insufficient_funds' }
+      : {}),
+  });
 }

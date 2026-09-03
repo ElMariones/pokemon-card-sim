@@ -121,24 +121,31 @@ export async function applyTransactionInTx(
 }
 
 /**
- * Apply several movements for one user inside an existing transaction.
+ * Apply one movement repeatedly, as many times as the balance allows.
  *
  * Ripping fifty packs is fifty purchases, and the ledger must show fifty rows
  * (DESIGN.md section 22) — but it does not have to make fifty round trips to
- * find out the same balance fifty times. The row is read and locked once, each
- * movement is applied to the running balance in order, and the rows are
- * written in one insert. The result is byte-identical to calling
- * applyTransactionInTx in a loop.
+ * find out the same balance fifty times. The row is read and locked once, the
+ * movement is applied to the running balance until the next one would
+ * overdraw, and the rows are written in one insert. Every row is identical to
+ * what applyTransactionInTx would have written in a loop.
  *
- * Rejects the whole batch if any prefix would overdraw, so a caller that wants
- * "as many as they can afford" must size the batch itself.
+ * Sizing lives here rather than in the caller on purpose. A caller that wants
+ * "as many as they can afford" would otherwise have to read and lock the same
+ * row itself to divide by the price — two locked reads of one row inside one
+ * transaction, and a second place that decides what a balance can cover. The
+ * ledger owns that answer.
+ *
+ * Returns one result per movement actually applied, in order; an empty array
+ * means the player could not afford even one.
  */
-export async function applyTransactionsInTx(
+export async function applyRepeatedTransactionInTx(
   tx: LedgerTransaction,
   userId: string,
-  inputs: readonly Omit<TransactionInput, 'userId'>[],
+  input: Omit<TransactionInput, 'userId'>,
+  maxCount: number,
 ): Promise<TransactionResult[]> {
-  if (inputs.length === 0) return [];
+  if (maxCount < 1) return [];
 
   const [row] = await tx
     .select({ cash: users.cash })
@@ -153,9 +160,11 @@ export async function applyTransactionsInTx(
   const results: TransactionResult[] = [];
   const rows: (typeof transactions.$inferInsert)[] = [];
 
-  for (const input of inputs) {
+  for (let i = 0; i < maxCount; i++) {
     const next = cents(balance + input.amount);
-    if (next < 0) throw new InsufficientFundsError(balance, cents(-input.amount));
+    // Stop before the overdraw rather than throwing: the caller asked for
+    // "up to maxCount", and the movements already applied are legitimate.
+    if (next < 0) break;
     balance = next;
 
     const transactionId = randomUUID();
@@ -171,6 +180,8 @@ export async function applyTransactionsInTx(
       metadata: input.metadata ?? null,
     });
   }
+
+  if (rows.length === 0) return [];
 
   await tx.update(users).set({ cash: balance }).where(eq(users.id, userId));
   await tx.insert(transactions).values(rows);
