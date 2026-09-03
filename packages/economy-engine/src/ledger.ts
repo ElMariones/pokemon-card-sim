@@ -24,7 +24,9 @@ export type TransactionType =
   | 'sealed_purchase'
   | 'sealed_sale'
   | 'mission_reward'
-  | 'level_reward';
+  | 'level_reward'
+  | 'minigame_payout'
+  | 'cosmetic_purchase';
 
 export class InsufficientFundsError extends Error {
   constructor(readonly balance: Cents, readonly required: Cents) {
@@ -116,6 +118,64 @@ export async function applyTransactionInTx(
   });
 
   return { transactionId, balanceAfter: next };
+}
+
+/**
+ * Apply several movements for one user inside an existing transaction.
+ *
+ * Ripping fifty packs is fifty purchases, and the ledger must show fifty rows
+ * (DESIGN.md section 22) — but it does not have to make fifty round trips to
+ * find out the same balance fifty times. The row is read and locked once, each
+ * movement is applied to the running balance in order, and the rows are
+ * written in one insert. The result is byte-identical to calling
+ * applyTransactionInTx in a loop.
+ *
+ * Rejects the whole batch if any prefix would overdraw, so a caller that wants
+ * "as many as they can afford" must size the batch itself.
+ */
+export async function applyTransactionsInTx(
+  tx: LedgerTransaction,
+  userId: string,
+  inputs: readonly Omit<TransactionInput, 'userId'>[],
+): Promise<TransactionResult[]> {
+  if (inputs.length === 0) return [];
+
+  const [row] = await tx
+    .select({ cash: users.cash })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for('update')
+    .limit(1);
+
+  if (!row) throw new Error(`No such user: ${userId}`);
+
+  let balance = cents(row.cash);
+  const results: TransactionResult[] = [];
+  const rows: (typeof transactions.$inferInsert)[] = [];
+
+  for (const input of inputs) {
+    const next = cents(balance + input.amount);
+    if (next < 0) throw new InsufficientFundsError(balance, cents(-input.amount));
+    balance = next;
+
+    const transactionId = randomUUID();
+    results.push({ transactionId, balanceAfter: next });
+    rows.push({
+      id: transactionId,
+      userId,
+      type: input.type,
+      amount: input.amount,
+      balanceAfter: next,
+      itemType: input.itemType ?? null,
+      itemId: input.itemId ?? null,
+      metadata: input.metadata ?? null,
+    });
+  }
+
+  await tx.update(users).set({ cash: balance }).where(eq(users.id, userId));
+  await tx.insert(transactions).values(rows);
+
+  return results;
 }
 
 /**

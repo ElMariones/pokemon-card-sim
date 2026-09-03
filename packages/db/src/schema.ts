@@ -374,3 +374,61 @@ export const npcNegotiations = pgTable('npc_negotiations', {
     .where(sql`${t.status} = 'active'`),
   index('npc_negotiations_user_idx').on(t.userId, t.updatedAt),
 ]);
+
+/**
+ * One arcade run. The row *is* the run token (see the minigames arcade spec).
+ *
+ * A skill game cannot be fully server-authoritative — only the browser knows
+ * whether the player cleared the obstacle — so the design bounds the exploit
+ * rather than claiming to close it. This table is three of those four bounds:
+ * the id is opaque and single-use, `startedAt` is the server's own clock
+ * rather than the client's, and `seed` lets the server rebuild exactly what
+ * was played.
+ *
+ * Rejected claims are kept, not deleted. The audit trail is the only way
+ * anyone would ever notice the scheme being probed.
+ */
+export const minigameRuns = pgTable('minigame_runs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  game: text('game').notNull(),
+  seed: text('seed').notNull(),
+  status: text('status').notNull().default('open'),
+  score: integer('score'),
+  durationMs: integer('duration_ms'),
+  /** Cents actually paid, after the daily-cap clamp. */
+  payout: integer('payout'),
+  rejectReason: text('reject_reason'),
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
+  settledAt: timestamp('settled_at'),
+}, (t) => [
+  index('minigame_runs_user_idx').on(t.userId, t.startedAt),
+  index('minigame_runs_open_idx').on(t.userId, t.game, t.status),
+]);
+
+/**
+ * Which cosmetics a player owns, and which one is equipped per game.
+ *
+ * Both unique indexes are load-bearing. The first makes a double-clicked buy
+ * button incapable of charging twice — in the database, not in a check that
+ * happened a moment earlier. The second makes "exactly one equipped per game"
+ * an invariant the database enforces, so a half-finished swap cannot leave a
+ * player with two skins equipped or none.
+ *
+ * The free default is never stored. Owning nothing for a game *is* owning the
+ * default, so a new player needs no seeding.
+ */
+export const minigameCosmetics = pgTable('minigame_cosmetics', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  cosmeticId: text('cosmetic_id').notNull(),
+  game: text('game').notNull(),
+  equipped: boolean('equipped').notNull().default(false),
+  acquiredAt: timestamp('acquired_at').notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('minigame_cosmetics_user_item_uq').on(t.userId, t.cosmeticId),
+  uniqueIndex('minigame_cosmetics_equipped_uq').on(t.userId, t.game)
+    .where(sql`${t.equipped}`),
+  index('minigame_cosmetics_user_idx').on(t.userId, t.game),
+]);
