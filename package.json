@@ -34,6 +34,7 @@
     "data:apply-prices-supabase-2026": "tsx scripts/import/apply-prices-supabase-2026.ts",
     "data:price-packs": "tsx scripts/simulate/price-packs.ts",
     "db:rebuild": "npm run db:reset && npm run db:push && npm run data:sets && npm run data:cards && npm run data:apply-prices && npm run data:price-packs && npm run data:pack-prices",
+    "data:sprites": "tsx scripts/import/fetch-sprites.ts",
     "data:tcgcsv": "tsx scripts/import/fetch-tcgcsv.ts",
     "data:pack-prices": "tsx scripts/import/apply-pack-prices.ts",
     "db:sync-supabase": "tsx scripts/import/sync-supabase.ts"
