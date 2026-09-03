@@ -768,6 +768,71 @@ Examples:
 
 ---
 
+## 16a. Minigames Arcade
+
+Three short skill games at `/games` — Flappy Pokémon, Card Match and Speed Type
+— that pay real cash into the same wallet that buys packs, plus a shop selling
+cosmetics for them.
+
+The arcade is a side income and a spending sink, never a second economy. A
+player who ignores it loses nothing but flavour.
+
+### The cap
+
+**$150.00 per UTC day, across all three games.** This is the number that keeps
+§30 intact: if grinding Flappy were the cheapest route to a booster box, every
+other loop would become decoration.
+
+It is computed from the ledger — the sum of `minigame_payout` transactions since
+UTC midnight — never held in a counter. A counter drifts when a request fails
+halfway and nothing can repair it afterwards, which is the same reasoning
+mission progress uses.
+
+A payout is clamped to whatever remains, so a great run when nearly capped pays
+the remainder rather than failing outright.
+
+### Runs, and the honest limit of §22
+
+§22 says the server decides every economic outcome and the client never reports
+what it got. A skill game cannot honour that: only the browser knows whether the
+player cleared the obstacle.
+
+The design does not pretend otherwise. It bounds the exploit along four axes:
+
+1. **Single-use tokens.** A run is a row in `minigame_runs`. Settling it is a
+   state transition under a row lock, so a captured request cannot be replayed.
+2. **An independent clock.** `started_at` is the server's own, and elapsed time
+   is measured against it. The client's claimed duration can only ever make a
+   claim stricter.
+3. **Reproducible content.** The passage, the board and the obstacle sequence
+   are generated from the run's seed, so the server knows what was achievable.
+   Speed Type is checkable exactly: a claim of more correct characters than the
+   passage contains is refuted by arithmetic.
+4. **A ceiling on the prize.** Even a perfect forgery is worth at most the
+   remaining daily allowance.
+
+Rejected claims are stored with their reason rather than discarded. The audit
+trail is the only way anyone would notice the scheme being probed.
+
+Full server-side replay of an input trace was considered and rejected: it would
+put every game's physics into a DOM-free shared simulation, roughly doubling the
+work, to protect a capped decorative currency.
+
+### Cosmetics
+
+Purely visual, and that is a rule rather than a current limitation: nothing in
+the shop may change a payout, a hitbox, or a difficulty curve. Buying Rayquaza
+does not make you richer.
+
+Prices live in `@pcs/minigame-engine`, not the database, because they are game
+design rather than player data — and because the buy endpoint must resolve a
+price from an id it was given, never accept a price it was told.
+
+Each game has exactly one free default, which is never stored as a row: owning
+nothing for a game *is* owning the default, so a new player needs no seeding.
+
+---
+
 ## 17. Set Completion System
 
 Set pages should be one of the main navigation hubs.

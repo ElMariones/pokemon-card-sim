@@ -9,6 +9,15 @@ this file is the set of rules that keep the code honest.
 2. **The server decides every economic outcome.** Pack contents, prices, grades,
    balances. The client asks "open pack 123"; it never reports what it got.
    (DESIGN.md §22.)
+
+   The arcade is the one documented exception, because a skill game cannot
+   honour this — only the browser knows whether the player cleared the
+   obstacle. It *bounds* the lie instead: single-use run rows, the server's own
+   clock, content rebuilt from the seed, and a daily cap that limits what even
+   a perfect forgery collects. See DESIGN.md §16a and
+   `docs/superpowers/specs/2026-09-03-minigames-arcade-design.md`. Do not treat
+   it as a precedent — anything that is not a skill game stays fully
+   server-authoritative.
 3. **Never fake precision.** Every pull rate and price carries a `Confidence`.
    Only `official` / `manufacturer_published` may be shown as an exact
    percentage; everything else says "estimated". (DESIGN.md §5.)
