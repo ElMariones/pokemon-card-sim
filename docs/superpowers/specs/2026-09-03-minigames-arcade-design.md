@@ -227,19 +227,48 @@ remainder rather than failing.
 Every ceiling is generous against real play and decisive against fabrication.
 They exist to refuse the impossible, not to police the merely excellent.
 
-### Sprites
+### Art
 
-`scripts/import/fetch-sprites.ts` downloads the listed Gen-V animated sprites
-from the PokeAPI sprite repository into `apps/web/public/sprites/pokemon/`,
-skipping files it already has. Wired up as `npm run data:sprites`.
+Everything the arcade sells is a picture of a Pokémon, and the catalogue names
+which one with three fields — `sprite` (a dex number, the animated battle
+sprite you fly), `artwork` (a dex number, the official artwork used as a card
+back or a typing backdrop) and `image` (a committed file used verbatim, which
+only the real Pokémon card back needs). `cosmeticImage()` resolves any item to
+its picture, and one component — `CosmeticArt.tsx` — draws it wherever it
+appears, so the shop's preview cannot drift from the thing you equip.
+
+Two importers fetch what the catalogue asks for, each deriving its list from
+`COSMETICS` rather than repeating it:
+
+- `npm run data:sprites` — Gen-V animated GIFs into `public/sprites/pokemon/`.
+- `npm run data:artwork` — official artwork, re-encoded to 480px WebP with
+  sharp, into `public/sprites/artwork/`. The originals are ~130 KB PNGs and
+  nothing draws one above 480px.
 
 The files are **committed, not hotlinked**. Card art is hotlinked because the
-catalogue is tens of thousands of images that change; this is six small GIFs
-that never change. Committing them keeps a new host out of `next.config`
-`remotePatterns` and keeps the arcade working without a network round trip.
+catalogue is tens of thousands of images that change; this is a fixed set of a
+dozen small files that never change. Committing them keeps a new host out of
+`next.config` `remotePatterns` and keeps the arcade working without a network
+round trip.
 
-Unlike the `data:*` importers, this one touches no database, so it does not
-carry the PGlite single-process hazard and is safe to run with the dev server up.
+Unlike the `data:*` importers, neither touches a database, so they do not carry
+the PGlite single-process hazard and are safe to run with the dev server up.
+
+### Hitboxes
+
+A sprite frame is a box with a Pokémon somewhere inside it, and how much of the
+box the animal fills varies from 78% to 96% across the roster. Colliding
+against the frame kills the player against visible daylight, and drawing every
+species into one square box stretches the ones that are not square.
+
+So the frame is measured rather than assumed: `opaqueBounds()` (pure, in the
+engine package) scans the alpha channel for the tightest rectangle containing
+anything; `useSpriteBounds` runs it once per sprite in a canvas and caches the
+result with the frame's own dimensions. Flappy then scales the whole frame so
+the *body* comes out at a fixed size, places it so the body's centre is the
+bird's position, and collides against that body less a small forgiveness
+margin. The sprite is drawn mirrored — front sprites face left, and the bird
+flies right — so the measured bounds are mirrored with it.
 
 ## Testing
 

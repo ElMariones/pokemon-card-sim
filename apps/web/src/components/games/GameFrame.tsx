@@ -109,12 +109,17 @@ export function GameFrame({
             {result.payout > 0 ? `+${money(result.payout)}` : "No payout"}
           </p>
 
+          {/* Two different things pay nothing, and telling a player their
+              allowance is spent when they simply scored zero is a lie that
+              reads as a bug. The cap is what is left, not what was paid. */}
           <p className="text-manila-3 mx-auto mt-3 max-w-sm text-xs leading-relaxed">
-            {result.payout === 0
+            {result.capRemaining <= 0
               ? "Today's allowance is spent. Scores still count towards your best — the arcade just stops paying until midnight UTC."
-              : result.capped
-                ? "That is the last of today's allowance. The run was worth more, but the cap is the cap."
-                : `${money(result.capRemaining as Cents)} of today's allowance left.`}
+              : result.payout === 0
+                ? "Nothing scored, nothing paid. Go again."
+                : result.capped
+                  ? "That is the last of today's allowance. The run was worth more, but the cap is the cap."
+                  : `${money(result.capRemaining as Cents)} of today's allowance left.`}
           </p>
 
           {result.score >= result.best && result.score > 0 && (

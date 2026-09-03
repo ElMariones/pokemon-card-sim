@@ -7,16 +7,10 @@ import { money } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { usePlayer } from "@/components/PlayerProvider";
 import type { Cents } from "@pcs/shared";
-import type { MinigameId } from "@pcs/minigame-engine";
+import type { Cosmetic, MinigameId } from "@pcs/minigame-engine";
+import { CosmeticPreview, paletteVars } from "@/components/games/CosmeticArt";
 
-interface CosmeticView {
-  id: string;
-  game: MinigameId;
-  name: string;
-  blurb: string;
-  price: number;
-  sprite?: number;
-  palette: [string, string];
+interface CosmeticView extends Cosmetic {
   owned: boolean;
   equipped: boolean;
 }
@@ -27,8 +21,8 @@ interface ArcadeView {
 
 const SECTIONS: { game: MinigameId; title: string; note: string }[] = [
   { game: "flappy", title: "Who you fly as", note: "Flappy Pokémon. Purely who you are — none of them fly better." },
-  { game: "match", title: "The back of the card", note: "Card Match. What you are looking at while you try to remember." },
-  { game: "type", title: "What you type on", note: "Speed Type. The surface under the passage." },
+  { game: "match", title: "The back of the card", note: "Card Match. Twelve of these, face down — the genuine blue back until you buy your way off it." },
+  { game: "type", title: "What you type over", note: "Speed Type. The art behind the passage, kept dim enough to read through." },
 ];
 
 export default function ShopPage() {
@@ -122,34 +116,10 @@ export default function ShopPage() {
                     <li
                       key={item.id}
                       className={cn("pane cosmetic flex flex-col", item.equipped && "cosmetic--equipped")}
-                      style={{
-                        ["--cab" as string]: item.palette[0],
-                        ["--cab-deep" as string]: item.palette[1],
-                      }}
+                      style={paletteVars(item.palette)}
                     >
                       <div className="cosmetic__swatch">
-                        {item.sprite ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={`/sprites/pokemon/${item.sprite}.gif`}
-                            alt=""
-                            width={96}
-                            height={96}
-                            className={cn(
-                              "pixel h-14 w-14 object-contain",
-                              item.owned ? "sprite-bob" : "opacity-45 grayscale",
-                            )}
-                          />
-                        ) : (
-                          <span
-                            className="h-12 w-9 rounded-[3px] border"
-                            style={{
-                              borderColor: "var(--color-seam)",
-                              background: "linear-gradient(150deg, var(--cab), var(--cab-deep))",
-                              opacity: item.owned ? 1 : 0.45,
-                            }}
-                          />
-                        )}
+                        <CosmeticPreview cosmetic={item} owned={item.owned} />
                       </div>
 
                       <div className="flex flex-1 flex-col p-4">

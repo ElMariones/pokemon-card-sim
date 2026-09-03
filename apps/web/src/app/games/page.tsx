@@ -7,16 +7,10 @@ import { money } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ArcadeCabinet } from "@/components/games/ArcadeCabinet";
 import type { Cents } from "@pcs/shared";
-import type { MinigameId } from "@pcs/minigame-engine";
+import type { Cosmetic, MinigameId } from "@pcs/minigame-engine";
+import { CardBack, TypeBackdrop } from "@/components/games/CosmeticArt";
 
-interface CosmeticView {
-  id: string;
-  game: MinigameId;
-  name: string;
-  blurb: string;
-  price: number;
-  sprite?: number;
-  palette: [string, string];
+interface CosmeticView extends Cosmetic {
   owned: boolean;
   equipped: boolean;
 }
@@ -185,50 +179,56 @@ export default function GamesPage() {
 function CabinetScreen({ game, cosmetic }: { game: MinigameId; cosmetic?: CosmeticView }) {
   if (game === "flappy") {
     return (
-      <div className="absolute inset-0 grid place-items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/sprites/pokemon/${cosmetic?.sprite ?? 16}.gif`}
-          alt=""
-          width={96}
-          height={96}
-          className="pixel sprite-bob h-16 w-16 object-contain"
-        />
-        <div className="absolute inset-x-0 bottom-0 flex justify-around opacity-70">
-          <span className="stack !relative !w-6" style={{ height: 26 }} />
-          <span className="stack !relative !w-6" style={{ height: 40 }} />
-          <span className="stack !relative !w-6" style={{ height: 18 }} />
+      <div className="cabinet-route absolute inset-0 grid place-items-center">
+        <span className="inline-block -scale-x-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/sprites/pokemon/${cosmetic?.sprite ?? 16}.gif`}
+            alt=""
+            width={96}
+            height={96}
+            className="pixel sprite-bob h-16 w-16 object-contain"
+          />
+        </span>
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-around opacity-90">
+          <span className="stack stack--bottom !relative !w-7" style={{ height: 34 }} />
+          <span className="stack stack--bottom !relative !w-7" style={{ height: 52 }} />
+          <span className="stack stack--bottom !relative !w-7" style={{ height: 24 }} />
         </div>
       </div>
     );
   }
 
   if (game === "match") {
+    // Six of the back the player actually flips, one already turned over.
     return (
-      <div className="absolute inset-0 grid grid-cols-3 content-center justify-center gap-2 p-6">
+      <div className="absolute inset-0 grid grid-cols-3 content-center justify-items-center gap-2 p-6">
         {[0, 1, 2, 3, 4, 5].map((i) => (
-          <span
-            key={i}
-            className="rounded-[3px] border"
-            style={{
-              aspectRatio: "5 / 7",
-              borderColor: "var(--color-seam)",
-              background: `linear-gradient(150deg, var(--cab), var(--cab-deep))`,
-              opacity: i === 2 ? 0.28 : 1,
-            }}
-          />
+          <span key={i} className="block w-full" style={{ opacity: i === 2 ? 0.28 : 1 }}>
+            <CardBack cosmetic={cosmetic} />
+          </span>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="absolute inset-0 grid place-items-center px-6">
-      <p className="t-mono text-center text-[13px] leading-relaxed">
-        <span style={{ color: "var(--cab)" }}>evolving sk</span>
-        <span className="text-manila bg-white/10 rounded-[2px]">i</span>
-        <span className="text-manila-3">es booster box</span>
-      </p>
+    // Sized with h-full rather than `absolute inset-0`, because .type-surface
+    // sets position: relative and would win the cascade against Tailwind's
+    // .absolute — leaving a zero-height wrapper and nothing to paint into.
+    //
+    // The backdrop is also deliberately not a child of the grid: an absolutely
+    // positioned grid item is laid out against its *grid area*, not the
+    // container, so `inset: 0` there would size it to the one line of text.
+    <div className="type-surface h-full w-full">
+      <TypeBackdrop cosmetic={cosmetic} />
+      <div className="absolute inset-0 grid place-items-center px-6">
+        <p className="t-mono text-center text-[13px] leading-relaxed">
+          <span style={{ color: "var(--cab)" }}>evolving sk</span>
+          <span className="text-manila bg-white/10 rounded-[2px]">i</span>
+          <span className="text-manila-3">es booster box</span>
+        </p>
+      </div>
     </div>
   );
 }

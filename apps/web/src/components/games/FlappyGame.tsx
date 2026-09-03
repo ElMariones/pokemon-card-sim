@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { boundsHeight, boundsWidth, mirrorBounds } from "@pcs/minigame-engine";
 import { useMinigameRun } from "./useMinigameRun";
+import { useSpriteBounds, type SpriteMeasurement } from "./useSpriteBounds";
 import { GameFrame } from "./GameFrame";
 
 /**
@@ -12,8 +14,10 @@ import { GameFrame } from "./GameFrame";
  * and canvas drawImage paints only their first frame. On a canvas the player
  * would fly a dead sprite.
  *
- * The obstacles are stacked booster boxes. Gap centres come from the run's
- * seed, so the level is the server's rather than the browser's.
+ * The obstacles are stacked booster boxes with a Poké Ball on the cap, flying
+ * over a Route: a ridge line, a tree line and a grass verge, each scrolling at
+ * its own speed so the field has depth. Gap centres come from the run's seed,
+ * so the level is the server's rather than the browser's.
  *
  * Every constant below sits comfortably inside the plausibility ceiling the
  * server checks: obstacles arrive every 1500ms at the fastest, against a floor
@@ -22,6 +26,12 @@ import { GameFrame } from "./GameFrame";
 
 const W = 720;
 const H = 460;
+/**
+ * The top of the grass verge: the floor the player dies on, and the line every
+ * obstacle stands on. The CSS draws the verge from this same y — see
+ * `.route-ground` in arcade.css, which is the one place the two have to agree.
+ */
+const FLOOR = 414;
 
 const GRAVITY = 1_700;       // px per second squared
 const FLAP = -470;           // px per second, applied instantly
@@ -29,12 +39,32 @@ const SCROLL = 168;          // px per second
 const SPAWN_MS = 1_500;
 const STACK_W = 62;
 const BIRD_X = 150;
-const BIRD_SIZE = 46;
+
+/**
+ * How large the Pokémon itself is drawn — the animal, not its image.
+ *
+ * The sprite sheet's 96px box is mostly empty, and how much of it each species
+ * fills varies wildly. Sizing to the measured body instead means Pidgey and
+ * Rayquaza look like they belong in the same game and, more importantly, fly
+ * the same difficulty.
+ */
+const BIRD_BODY = 46;
+
+/**
+ * How much of the measured body the hitbox keeps.
+ *
+ * Even a tight box is generous around a wing or a tail, and a near miss should
+ * read as a near miss. Trimming a little is what makes the collision agree with
+ * what the player saw.
+ */
+const HITBOX_FORGIVENESS = 0.86;
 
 const GAP_START = 190;
-const GAP_MIN = 140;
+const GAP_MIN = 138;
 /** How many obstacles it takes to reach the tightest gap. */
 const GAP_TIGHTEN_OVER = 30;
+/** Keeps a gap fully on screen however the seed fell. */
+const GAP_MARGIN = 78;
 
 const gapFor = (score: number) =>
   Math.max(GAP_MIN, GAP_START - (GAP_START - GAP_MIN) * (score / GAP_TIGHTEN_OVER));
@@ -47,16 +77,54 @@ interface Obstacle {
   passed: boolean;
 }
 
+/** Everything the loop and the renderer need to know about the equipped body. */
+interface BirdGeometry {
+  /** The <img> box, at the sprite's own aspect ratio so nothing is stretched. */
+  imageW: number;
+  imageH: number;
+  hitW: number;
+  hitH: number;
+  /** Body centre within the image box, 0..1, after mirroring. */
+  cx: number;
+  cy: number;
+}
+
+function geometryFor(sprite: SpriteMeasurement): BirdGeometry {
+  // The sprite is drawn mirrored so it faces the way it is travelling, which
+  // moves the body within its box — so the hitbox has to be mirrored with it.
+  const m = mirrorBounds(sprite.bounds);
+  const bw = boundsWidth(m);
+  const bh = boundsHeight(m);
+
+  // Scale the whole frame, not each axis: these frames are not square, and
+  // fitting one into a square box is what stretches Gyarados.
+  const scale = BIRD_BODY / Math.max(bw * sprite.width, bh * sprite.height, 1);
+  const imageW = sprite.width * scale;
+  const imageH = sprite.height * scale;
+
+  return {
+    imageW,
+    imageH,
+    hitW: bw * imageW * HITBOX_FORGIVENESS,
+    hitH: bh * imageH * HITBOX_FORGIVENESS,
+    cx: (m.x0 + m.x1) / 2,
+    cy: (m.y0 + m.y1) / 2,
+  };
+}
+
 export function FlappyGame() {
   const { status, run, result, error, start, settle, reset } = useMinigameRun("flappy");
   const [score, setScore] = useState(0);
 
-  const birdRef = useRef<HTMLImageElement>(null);
+  const birdRef = useRef<HTMLSpanElement>(null);
   const obstacleLayer = useRef<HTMLDivElement>(null);
 
   // Simulation state lives in refs, not state: the loop runs every frame, and
   // re-rendering React sixty times a second would be the whole frame budget.
-  const y = useRef(H / 2);
+  // `y` is the centre of the bird's body, not the corner of its image — the
+  // image's corner moves when the equipped sprite changes and the body's
+  // centre does not.
+  const y = useRef(FLOOR / 2);
   const vy = useRef(0);
   const obstacles = useRef<Obstacle[]>([]);
   const spawnAcc = useRef(0);
@@ -68,6 +136,14 @@ export function FlappyGame() {
 
   const sprite = run?.equipped.sprite ?? 16;
   const palette = run?.equipped.palette ?? ["#c8a870", "#6d5a3a"];
+
+  const measurement = useSpriteBounds(`/sprites/pokemon/${sprite}.gif`);
+  const bird = useMemo(() => geometryFor(measurement), [measurement]);
+
+  // The measurement resolves a frame or two into the run, so the loop reads it
+  // through a ref rather than closing over it.
+  const geomRef = useRef(bird);
+  useEffect(() => { geomRef.current = bird; }, [bird]);
 
   const end = useCallback(() => {
     if (!running.current) return;
@@ -98,7 +174,7 @@ export function FlappyGame() {
   useEffect(() => {
     if (status !== "playing" || !run) return;
 
-    y.current = H / 2;
+    y.current = FLOOR / 2;
     vy.current = 0;
     obstacles.current = [];
     spawnAcc.current = 0;
@@ -117,6 +193,8 @@ export function FlappyGame() {
       const dt = Math.min(0.05, (now - lastFrame.current) / 1000);
       lastFrame.current = now;
 
+      const { hitW, hitH, cx, cy, imageW, imageH } = geomRef.current;
+
       vy.current += GRAVITY * dt;
       y.current += vy.current * dt;
 
@@ -127,8 +205,7 @@ export function FlappyGame() {
         const fraction = seededGaps[i % seededGaps.length] ?? 0.5;
         obstacles.current.push({
           x: W,
-          // Keep the gap fully on screen however the seed fell.
-          centre: Math.min(H - 90, Math.max(90, fraction * H)),
+          centre: Math.min(FLOOR - GAP_MARGIN, Math.max(GAP_MARGIN, fraction * FLOOR)),
           gap: gapFor(scoreRef.current),
           passed: false,
         });
@@ -144,18 +221,21 @@ export function FlappyGame() {
       }
       obstacles.current = obstacles.current.filter((o) => o.x > -STACK_W - 20);
 
-      // Floor and ceiling are both fatal, so there is no corner to park in.
-      if (y.current < 0 || y.current + BIRD_SIZE > H) {
+      const top = y.current - hitH / 2;
+      const bottom = y.current + hitH / 2;
+      const left = BIRD_X - hitW / 2;
+      const right = BIRD_X + hitW / 2;
+
+      // The ceiling and the grass are both fatal, so there is no corner to
+      // park in.
+      if (top < 0 || bottom > FLOOR) {
         endRef.current();
         return;
       }
 
       for (const o of obstacles.current) {
-        const overlapsX = BIRD_X + BIRD_SIZE > o.x && BIRD_X < o.x + STACK_W;
-        if (!overlapsX) continue;
-        const top = o.centre - o.gap / 2;
-        const bottom = o.centre + o.gap / 2;
-        if (y.current < top || y.current + BIRD_SIZE > bottom) {
+        if (right <= o.x || left >= o.x + STACK_W) continue;
+        if (top < o.centre - o.gap / 2 || bottom > o.centre + o.gap / 2) {
           endRef.current();
           return;
         }
@@ -164,8 +244,12 @@ export function FlappyGame() {
       // Paint by writing transforms directly, bypassing React entirely.
       if (birdRef.current) {
         const tilt = Math.max(-24, Math.min(70, vy.current * 0.06));
+        // Place the image so the *body's* centre lands on (BIRD_X, y). The
+        // element's transform-origin is that same point, so the tilt pivots
+        // around the animal rather than around the empty box holding it.
         birdRef.current.style.transform =
-          `translate3d(${BIRD_X}px, ${y.current}px, 0) rotate(${tilt}deg)`;
+          `translate3d(${BIRD_X - cx * imageW}px, ${y.current - cy * imageH}px, 0)` +
+          ` rotate(${tilt}deg)`;
       }
 
       const layer = obstacleLayer.current;
@@ -174,7 +258,9 @@ export function FlappyGame() {
         // frame — churning the DOM at 60fps is what makes these feel cheap.
         while (layer.childElementCount < obstacles.current.length * 2) {
           const el = document.createElement("span");
-          el.className = "stack";
+          el.className = layer.childElementCount % 2 === 0
+            ? "stack stack--top"
+            : "stack stack--bottom";
           layer.appendChild(el);
         }
         const children = layer.children;
@@ -182,21 +268,21 @@ export function FlappyGame() {
           (children[n] as HTMLElement).style.display = "none";
         }
         obstacles.current.forEach((o, idx) => {
-          const top = children[idx * 2] as HTMLElement | undefined;
-          const bottom = children[idx * 2 + 1] as HTMLElement | undefined;
+          const above = children[idx * 2] as HTMLElement | undefined;
+          const below = children[idx * 2 + 1] as HTMLElement | undefined;
           const gapTop = o.centre - o.gap / 2;
           const gapBottom = o.centre + o.gap / 2;
-          if (top) {
-            top.style.display = "block";
-            top.style.width = `${STACK_W}px`;
-            top.style.height = `${Math.max(0, gapTop)}px`;
-            top.style.transform = `translate3d(${o.x}px, 0, 0)`;
+          if (above) {
+            above.style.display = "block";
+            above.style.width = `${STACK_W}px`;
+            above.style.height = `${Math.max(0, gapTop)}px`;
+            above.style.transform = `translate3d(${o.x}px, 0, 0)`;
           }
-          if (bottom) {
-            bottom.style.display = "block";
-            bottom.style.width = `${STACK_W}px`;
-            bottom.style.height = `${Math.max(0, H - gapBottom)}px`;
-            bottom.style.transform = `translate3d(${o.x}px, ${gapBottom}px, 0)`;
+          if (below) {
+            below.style.display = "block";
+            below.style.width = `${STACK_W}px`;
+            below.style.height = `${Math.max(0, FLOOR - gapBottom)}px`;
+            below.style.transform = `translate3d(${o.x}px, ${gapBottom}px, 0)`;
           }
         });
       }
@@ -248,7 +334,7 @@ export function FlappyGame() {
   return (
     <GameFrame
       name="Flappy Pokémon"
-      rule="Click, tap or press Space to flap. The floor and the ceiling are both fatal."
+      rule="Click, tap or press Space to flap. The ceiling and the grass are both fatal."
       status={status}
       error={error}
       result={result}
@@ -266,7 +352,7 @@ export function FlappyGame() {
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); flap(); }
         }}
-        className="playfield mx-auto w-full cursor-pointer"
+        className="playfield playfield--route mx-auto w-full cursor-pointer"
         style={{ maxWidth: W, aspectRatio: `${W} / ${H}` }}
       >
         {/* A fixed internal coordinate space, scaled to whatever width the
@@ -276,17 +362,37 @@ export function FlappyGame() {
           className="absolute left-0 top-0 origin-top-left"
           style={{ width: W, height: H, transform: "scale(var(--field-scale, 1))" }}
         >
+          {/* The Route, back to front. Each layer scrolls at its own speed, so
+              the ridge crawls, the trees walk and the grass keeps pace exactly
+              with the obstacles standing on it. */}
+          <div className="route-sun" aria-hidden="true" />
+          <div className="route-clouds" aria-hidden="true" />
+          <div className="route-ridge" aria-hidden="true" />
+          <div className="route-trees" aria-hidden="true" />
+
           <div ref={obstacleLayer} className="absolute inset-0" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+
+          <div className="route-ground" aria-hidden="true" />
+
+          <span
             ref={birdRef}
-            src={`/sprites/pokemon/${sprite}.gif`}
-            alt=""
-            width={BIRD_SIZE}
-            height={BIRD_SIZE}
-            className="pixel absolute left-0 top-0 will-change-transform"
-            style={{ width: BIRD_SIZE, height: BIRD_SIZE }}
-          />
+            className="absolute left-0 top-0 block will-change-transform"
+            style={{
+              width: bird.imageW,
+              height: bird.imageH,
+              transformOrigin: `${bird.cx * 100}% ${bird.cy * 100}%`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/sprites/pokemon/${sprite}.gif`}
+              alt=""
+              // Front sprites are drawn facing left, towards the trainer. This
+              // one is flying right, so it is mirrored — about the image box's
+              // own centre, which is exactly what mirrorBounds models.
+              className="pixel h-full w-full -scale-x-100"
+            />
+          </span>
         </div>
 
         <FieldScale width={W} />

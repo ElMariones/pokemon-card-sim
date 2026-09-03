@@ -4,13 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MATCH_PAIRS } from "@pcs/minigame-engine";
 import { cn } from "@/lib/cn";
 import { useMinigameRun, type MatchFace } from "./useMinigameRun";
+import { CardBack } from "./CosmeticArt";
 import { GameFrame } from "./GameFrame";
 
 /**
  * Card Match.
  *
- * Twelve pairs of real card art, face down. The layout comes from the run's
- * seed, so reloading deals the same board rather than a friendlier one.
+ * Twelve pairs of real card art, face down, behind the back the player has
+ * equipped — the genuine blue back until they buy their way off it. The layout
+ * comes from the run's seed, so reloading deals the same board rather than a
+ * friendlier one.
  *
  * Scoring is deliberately weighted towards moves rather than seconds:
  *
@@ -146,7 +149,9 @@ export function MatchGame() {
                 )}
               >
                 <span className="match-cell__inner">
-                  <span className="match-cell__face match-cell__face--back" />
+                  <span className="match-cell__face match-cell__face--back">
+                    <CardBack cosmetic={run.equipped} />
+                  </span>
                   <span className="match-cell__face match-cell__face--front">
                     {face && (
                       /* eslint-disable-next-line @next/next/no-img-element */

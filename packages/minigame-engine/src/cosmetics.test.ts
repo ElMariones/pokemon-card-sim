@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COSMETICS, MINIGAME_IDS, cosmeticById, cosmeticsForGame, defaultCosmeticFor,
+  ARTWORK_DEX, COSMETICS, FLAPPY_SPRITES, MINIGAME_IDS, cosmeticById, cosmeticImage,
+  cosmeticsForGame, defaultCosmeticFor,
 } from './index';
 
 describe('the cosmetics catalogue', () => {
@@ -34,6 +35,20 @@ describe('the cosmetics catalogue', () => {
   it('resolves a cosmetic by id and refuses an unknown one', () => {
     expect(cosmeticById('flappy-pidgey')?.game).toBe('flappy');
     expect(cosmeticById('nope')).toBeUndefined();
+  });
+
+  it('gives every item a picture, because a picture is the entire product', () => {
+    for (const c of COSMETICS) {
+      expect(cosmeticImage(c), c.id).toBeTruthy();
+    }
+  });
+
+  it('asks each importer for exactly the ids the catalogue draws', () => {
+    expect([...FLAPPY_SPRITES].sort()).toEqual(
+      [...new Set(cosmeticsForGame('flappy').map((c) => c.sprite!))].sort(),
+    );
+    const drawn = COSMETICS.flatMap((c) => (c.artwork ? [c.artwork] : []));
+    expect([...ARTWORK_DEX].sort()).toEqual([...new Set(drawn)].sort());
   });
 
   it('gives every flappy cosmetic a sprite to render', () => {

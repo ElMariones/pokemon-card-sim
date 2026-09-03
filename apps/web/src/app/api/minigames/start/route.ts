@@ -21,6 +21,13 @@ export interface MatchCard {
  * depends only on moves and elapsed time — so these are drawn fresh rather
  * than derived from the seed. What the seed decides is where they sit, which
  * is the part a player could otherwise re-roll by reloading.
+ *
+ * A board is only playable with twelve *distinct* faces, so coming up short is
+ * refused rather than padded. Padding would deal duplicate pictures across
+ * different pairs and make the board unwinnable; going quiet would deal twelve
+ * blank cards, which is what an empty catalogue used to look like from the
+ * player's side. The message names the fix, because the only way to be here is
+ * an install whose catalogue was never imported.
  */
 async function matchCards(): Promise<MatchCard[]> {
   const db = await getDb();
@@ -31,7 +38,18 @@ async function matchCards(): Promise<MatchCard[]> {
     .orderBy(sql`random()`)
     .limit(MATCH_PAIRS);
 
-  return rows.flatMap((r) => (r.image ? [{ id: r.id, name: r.name, image: r.image }] : []));
+  const faces = rows.flatMap((r) =>
+    r.image ? [{ id: r.id, name: r.name, image: r.image }] : [],
+  );
+
+  if (faces.length < MATCH_PAIRS) {
+    throw new MinigameError(
+      'The card catalogue has no art to deal from. Run `npm run data:all`.',
+      'catalogue_empty',
+    );
+  }
+
+  return faces;
 }
 
 export async function POST(request: Request) {

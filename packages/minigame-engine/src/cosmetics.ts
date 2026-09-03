@@ -10,6 +10,12 @@ import type { MinigameId } from './types';
  *
  * Nothing in this catalogue may affect a payout, a hitbox, or a difficulty
  * curve. Buying Rayquaza does not make you richer.
+ *
+ * Every item is a picture of a Pokémon, because that is what the arcade is
+ * decorating: the bird you fly, the back of the card you flip, the art behind
+ * the passage you type. The three `art*` fields below say which picture, and
+ * they are the only thing the UI needs in order to render an item — a palette
+ * is there to tint the furniture around it, never to stand in for it.
  */
 
 export interface Cosmetic {
@@ -18,14 +24,25 @@ export interface Cosmetic {
   name: string;
   blurb: string;
   price: Cents;
-  /** Dex number, naming the sprite file the importer downloads. Flappy only. */
+  /**
+   * Dex number of the animated battle sprite the player flies. Flappy only.
+   * Names the GIF `data:sprites` downloads into public/sprites/pokemon.
+   */
   sprite?: number;
+  /**
+   * Dex number of the official artwork used as a card back or a backdrop.
+   * Names the WebP `data:artwork` writes into public/sprites/artwork.
+   */
+  artwork?: number;
+  /**
+   * A committed image used exactly as-is, rather than framed. Only the real
+   * Pokémon card back needs this: it is already a card back, so wrapping it in
+   * a generated one would be drawing a frame around a frame.
+   */
+  image?: string;
   /** Two colours the UI themes the item's card and its game with. */
   palette: readonly [string, string];
 }
-
-/** Dex ids the sprite importer fetches. Kept beside the catalogue that needs them. */
-export const FLAPPY_SPRITES = [16, 41, 25, 130, 6, 384] as const;
 
 export const COSMETICS: readonly Cosmetic[] = [
   // --- Flappy: who you fly as -------------------------------------------
@@ -61,43 +78,71 @@ export const COSMETICS: readonly Cosmetic[] = [
   },
 
   // --- Match: the back of the card --------------------------------------
+  //
+  // The free default is the real card back — the blue one every player has
+  // held — so an unspent player is looking at the genuine article and every
+  // purchase is a deliberate step away from it.
   {
-    id: 'match-classic', game: 'match', name: 'Classic back',
-    blurb: 'The blue back you already know.',
-    price: cents(0), palette: ['#3a5aa8', '#1a2a5a'],
+    id: 'match-official', game: 'match', name: 'Official back',
+    blurb: 'The blue back, exactly as printed.',
+    price: cents(0), image: '/card-back.jpg', palette: ['#2f56a6', '#16255c'],
   },
   {
-    id: 'match-holo', game: 'match', name: 'Holo foil',
-    blurb: 'Catches the light on every flip.',
-    price: cents(4_000), palette: ['#6fe6ff', '#a98cff'],
+    id: 'match-pikachu', game: 'match', name: 'Pikachu back',
+    blurb: 'The mascot, on the side you see most.',
+    price: cents(4_000), artwork: 25, palette: ['#f2cb45', '#8a6a2a'],
   },
   {
-    id: 'match-gold', game: 'match', name: 'Gold etch',
-    blurb: 'Etched brass. Deeply unnecessary.',
-    price: cents(15_000), palette: ['#f7cd72', '#8a6a2a'],
+    id: 'match-eevee', game: 'match', name: 'Eevee back',
+    blurb: 'Undecided, and charming about it.',
+    price: cents(9_000), artwork: 133, palette: ['#c99a63', '#6d4a2a'],
   },
   {
-    id: 'match-glitch', game: 'match', name: 'Glitch back',
-    blurb: 'A misprint someone paid a lot for.',
-    price: cents(30_000), palette: ['#ff7ec2', '#8affc1'],
+    id: 'match-charizard', game: 'match', name: 'Charizard back',
+    blurb: 'Face down, and still the expensive one.',
+    price: cents(18_000), artwork: 6, palette: ['#e8763a', '#8a3a1a'],
+  },
+  {
+    id: 'match-mewtwo', game: 'match', name: 'Mewtwo back',
+    blurb: 'It already knows where the pair is.',
+    price: cents(32_000), artwork: 150, palette: ['#a98cff', '#4b3a8a'],
   },
 
-  // --- Type: the surface you type on ------------------------------------
+  // --- Type: the art behind the passage ---------------------------------
   {
-    id: 'type-manila', game: 'type', name: 'Manila pad',
-    blurb: 'Legal pad, felt-tip, no ceremony.',
-    price: cents(0), palette: ['#e6dcc9', '#6d6759'],
+    id: 'type-snorlax', game: 'type', name: 'Snorlax desk',
+    blurb: 'Nothing hurries him either.',
+    price: cents(0), artwork: 143, palette: ['#5f7fa6', '#2d3d55'],
   },
   {
-    id: 'type-brass', game: 'type', name: 'Brass terminal',
-    blurb: 'Amber phosphor on black glass.',
-    price: cents(4_500), palette: ['#f7cd72', '#d3a03c'],
+    id: 'type-lucario', game: 'type', name: 'Lucario focus',
+    blurb: 'Reads the passage before you do.',
+    price: cents(4_500), artwork: 448, palette: ['#5aa8d8', '#2a5a7a'],
   },
   {
-    id: 'type-foil', game: 'type', name: 'Foil holo',
-    blurb: 'Typing on the face of a Charizard.',
-    price: cents(18_000), palette: ['#a98cff', '#6fe6ff'],
+    id: 'type-mew', game: 'type', name: 'Mew study',
+    blurb: 'Pink, weightless, faintly smug.',
+    price: cents(12_000), artwork: 151, palette: ['#ff9ecb', '#8a3a63'],
   },
+  {
+    id: 'type-rayquaza', game: 'type', name: 'Rayquaza ozone',
+    blurb: 'Typing at altitude.',
+    price: cents(28_000), artwork: 384, palette: ['#5ac888', '#1a5a3a'],
+  },
+];
+
+/**
+ * The dex ids each importer fetches, derived from the catalogue rather than
+ * listed beside it. A hand-kept second list is a list that eventually
+ * disagrees with the first, and the failure would be a missing image in the
+ * shop rather than anything that raises.
+ */
+export const FLAPPY_SPRITES: readonly number[] = [
+  ...new Set(COSMETICS.flatMap((c) => (c.sprite ? [c.sprite] : []))),
+];
+
+export const ARTWORK_DEX: readonly number[] = [
+  ...new Set(COSMETICS.flatMap((c) => (c.artwork ? [c.artwork] : []))),
 ];
 
 const BY_ID = new Map(COSMETICS.map((c) => [c.id, c]));
@@ -112,4 +157,12 @@ export function defaultCosmeticFor(game: MinigameId): Cosmetic {
   const found = cosmeticsForGame(game).find((c) => c.price === 0);
   if (!found) throw new Error(`No free default cosmetic for ${game}`);
   return found;
+}
+
+/** Where an item's picture lives, or undefined for an item that has none. */
+export function cosmeticImage(cosmetic: Cosmetic): string | undefined {
+  if (cosmetic.image) return cosmetic.image;
+  if (cosmetic.artwork) return `/sprites/artwork/${cosmetic.artwork}.webp`;
+  if (cosmetic.sprite) return `/sprites/pokemon/${cosmetic.sprite}.gif`;
+  return undefined;
 }

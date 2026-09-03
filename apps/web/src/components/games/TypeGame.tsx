@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useMinigameRun } from "./useMinigameRun";
+import { TypeBackdrop } from "./CosmeticArt";
 import { GameFrame } from "./GameFrame";
 
 /**
  * Speed Type.
  *
  * The passage is built from card names, set names and hobby vocabulary, so it
- * reads as something from inside the game rather than as filler.
+ * reads as something from inside the game rather than as filler, and it is
+ * typed over whichever Pokémon the player has equipped — held well under half
+ * opacity, because this is the one game where the decoration sits directly
+ * behind the thing being read.
  *
  * This is the game the server can check exactly. It generated the same passage
  * from the same seed, so a claim of more correct characters than the passage
@@ -29,7 +33,7 @@ export function TypeGame() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const passage = run?.content.kind === "type" ? run.content.passage : "";
-  const palette = run?.equipped.palette ?? ["#e6dcc9", "#6d6759"];
+  const palette = run?.equipped.palette ?? ["#5f7fa6", "#2d3d55"];
 
   const correctChars = countCorrect(passage, typed);
   const elapsedSec = startedAt ? Math.max(0.001, (now - startedAt) / 1000) : 0;
@@ -106,13 +110,15 @@ export function TypeGame() {
     >
       {run && (
         <div
-          className="pane p-6"
+          className="pane type-surface p-6"
           onClick={() => inputRef.current?.focus()}
           style={{
             ["--cab" as string]: palette[0],
             ["--cab-deep" as string]: palette[1],
           }}
         >
+          <TypeBackdrop cosmetic={run.equipped} />
+
           <p className="type-passage" aria-label="Passage to type">
             {passage.split("").map((char, i) => {
               const state =
