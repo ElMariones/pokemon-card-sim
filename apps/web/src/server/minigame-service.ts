@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { getDb, type Database } from '@pcs/db';
-import { minigameCosmetics, minigameRuns, transactions } from '@pcs/db/schema';
+import { minigameCosmetics, minigameRuns, transactions, users } from '@pcs/db/schema';
 import { applyTransactionInTx, InsufficientFundsError } from '@pcs/economy-engine';
 import { cents, type Cents } from '@pcs/shared';
 import {
@@ -294,12 +294,15 @@ export async function settleRun(
       });
       balanceAfter = result.balanceAfter;
     } else {
+      // Nothing moved, so there is no ledger row to take a balance from — but
+      // the caller still needs one to render. Read it through the schema like
+      // every other query here rather than hand-writing SQL.
       const [row] = await tx
-        .select({ cash: sql<number>`cash` })
-        .from(sql`users`)
-        .where(sql`id = ${userId}`)
+        .select({ cash: users.cash })
+        .from(users)
+        .where(eq(users.id, userId))
         .limit(1);
-      balanceAfter = cents(Number(row?.cash ?? 0));
+      balanceAfter = cents(row?.cash ?? 0);
     }
 
     await tx.update(minigameRuns)

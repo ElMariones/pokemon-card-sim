@@ -47,9 +47,18 @@ export function TypeGame() {
     if (status === "playing") inputRef.current?.focus();
   }, [status]);
 
+  /**
+   * Stop, whether by Escape or by the button.
+   *
+   * Guarded on status because finishing the passage already settles the run:
+   * without this, hitting Stop on the result screen would post the same token
+   * a second time and greet the player with "that run has already been
+   * settled" over the payout they just earned.
+   */
   const finish = useCallback(() => {
+    if (status !== "playing") return;
     void settle(countCorrect(passage, typed));
-  }, [settle, passage, typed]);
+  }, [status, settle, passage, typed]);
 
   const begin = useCallback(async () => {
     setTyped("");
