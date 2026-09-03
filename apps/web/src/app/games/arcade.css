@@ -1,0 +1,319 @@
+/* ---------------------------------------------------------------------------
+   The arcade.
+
+   A coin-op cabinet standing in the corner of a serious card shop. It belongs
+   to the vitrine — same ink, same aluminium seams, same brass — but it is
+   recognisably a different piece of furniture: portrait rather than landscape,
+   a lit marquee across the top, and a screen instead of a label.
+
+   Every colour here resolves to a system token or to --cab, which each cabinet
+   sets from the cosmetic the player has equipped. The room is coloured by what
+   you own.
+
+   Kept out of globals.css deliberately: this loads with the /games segment and
+   nowhere else.
+   --------------------------------------------------------------------------- */
+
+.arcade {
+  --cab: var(--color-brass);
+  --cab-deep: var(--color-brass-dim);
+}
+
+/* --- The cabinet ---------------------------------------------------------- */
+
+.cabinet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--radius-pane);
+  border: 1px solid var(--color-seam);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-vitrine-2) 80%, transparent),
+    var(--color-vitrine) 62%,
+    color-mix(in oklab, var(--color-ink) 55%, var(--color-vitrine))
+  );
+  transition:
+    border-color 260ms var(--ease-vitrine),
+    box-shadow 260ms var(--ease-vitrine),
+    transform 260ms var(--ease-vitrine);
+}
+
+@media (hover: hover) {
+  .cabinet:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--cab) 45%, var(--color-seam));
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.42),
+      0 0 0 1px color-mix(in oklab, var(--cab) 18%, transparent);
+  }
+}
+
+.cabinet:focus-within {
+  border-color: color-mix(in oklab, var(--cab) 55%, var(--color-seam));
+}
+
+/* The marquee: the lit strip above the screen that names the machine. */
+.cabinet__marquee {
+  position: relative;
+  padding: 0.7rem 1rem 0.6rem;
+  border-bottom: 1px solid var(--color-seam);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--cab) 22%, transparent),
+      transparent 78%
+    ),
+    color-mix(in oklab, var(--color-ink) 70%, var(--color-vitrine));
+}
+
+/* The filament along the bottom edge of the marquee. */
+.cabinet__marquee::after {
+  content: "";
+  position: absolute;
+  inset-inline: 12%;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cab), transparent);
+  opacity: calc(0.35 + var(--glow) * 0.5);
+}
+
+/* --- The screen ----------------------------------------------------------- */
+
+.cabinet__screen {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in oklab, var(--cab) 12%, transparent),
+      transparent 70%
+    ),
+    var(--color-ink);
+}
+
+/* Scanlines. The one place the arcade is allowed to look like an arcade.
+   Tied to --glow, so the app's own intensity setting turns it down. */
+.cabinet__screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(var(--glow) * 0.5);
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.32) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* Glass curvature: a soft vignette so the screen reads as a tube, not a div. */
+.cabinet__screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: inset 0 0 42px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* --- Pixel art ------------------------------------------------------------ */
+
+/* Sprites are 96px originals. Smoothing them would waste the whole point. */
+.pixel {
+  image-rendering: pixelated;
+}
+
+.sprite-bob {
+  animation: sprite-bob 2.6s var(--ease-vitrine) infinite;
+}
+
+@keyframes sprite-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(-6px * var(--amp))); }
+}
+
+/* --- The credit meter ----------------------------------------------------- */
+
+/*
+ * The day's allowance, read as a coin counter. This is the number that makes
+ * the arcade's economy legible, so it gets the brass and the tabular figures.
+ */
+.credit-meter {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-vitrine-3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.credit-meter__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-brass-dim), var(--color-brass));
+  transition: width 620ms var(--ease-snap);
+}
+
+.credit-meter__fill--spent {
+  background: linear-gradient(90deg, var(--color-manila-3), var(--color-manila-3));
+}
+
+/* --- Playfields ----------------------------------------------------------- */
+
+.playfield {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-pane);
+  border: 1px solid var(--color-seam);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--cab) 8%, var(--color-ink)), var(--color-ink));
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* Flappy's obstacles are stacked booster boxes, not pipes. */
+.stack {
+  position: absolute;
+  width: 100%;
+  border: 1px solid color-mix(in oklab, var(--cab) 40%, var(--color-seam));
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--cab) 26%, var(--color-vitrine-2)) 0 13px,
+      color-mix(in oklab, var(--color-ink) 62%, var(--color-vitrine)) 13px 15px
+    );
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 3px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Card Match ----------------------------------------------------------- */
+
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .match-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.6rem; }
+}
+
+.match-cell {
+  aspect-ratio: 5 / 7;
+  perspective: 800px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.match-cell:disabled { cursor: default; }
+
+.match-cell__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 420ms var(--ease-snap);
+  transform-style: preserve-3d;
+}
+
+.match-cell--face-up .match-cell__inner { transform: rotateY(180deg); }
+
+.match-cell__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  backface-visibility: hidden;
+  border: 1px solid var(--color-seam);
+}
+
+.match-cell__face--back {
+  background:
+    linear-gradient(150deg, var(--cab), var(--cab-deep));
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.28);
+}
+
+.match-cell__face--front {
+  transform: rotateY(180deg);
+  background: var(--color-vitrine-3);
+}
+
+.match-cell--matched {
+  opacity: 0.55;
+  transition: opacity 320ms var(--ease-vitrine);
+}
+
+/* --- Speed Type ----------------------------------------------------------- */
+
+.type-passage {
+  font-family: var(--font-mono);
+  font-size: 1.0625rem;
+  line-height: 2;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+}
+
+.type-char--pending { color: var(--color-manila-3); }
+.type-char--correct { color: var(--cab); }
+
+.type-char--wrong {
+  color: var(--color-loss);
+  background: color-mix(in oklab, var(--color-loss) 20%, transparent);
+  border-radius: 2px;
+}
+
+.type-char--current {
+  color: var(--color-manila);
+  background: color-mix(in oklab, var(--cab) 30%, transparent);
+  border-radius: 2px;
+  box-shadow: inset 2px 0 0 var(--cab);
+}
+
+/* --- Shop ----------------------------------------------------------------- */
+
+.cosmetic {
+  position: relative;
+  overflow: hidden;
+  transition: border-color 220ms var(--ease-vitrine), transform 220ms var(--ease-vitrine);
+}
+
+@media (hover: hover) {
+  .cosmetic:hover { transform: translateY(-2px); }
+}
+
+.cosmetic--equipped {
+  border-color: color-mix(in oklab, var(--cab) 55%, var(--color-seam));
+}
+
+/* The equipped item gets a lit edge rather than a badge floating over the art. */
+.cosmetic--equipped::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cab), transparent);
+}
+
+.cosmetic__swatch {
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(90% 90% at 50% 30%, color-mix(in oklab, var(--cab) 26%, transparent), transparent 70%),
+    var(--color-ink);
+}
+
+/* --- Motion --------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-bob { animation: none; }
+  .cabinet, .cosmetic { transition: none; }
+  .cabinet:hover, .cosmetic:hover { transform: none; }
+  .match-cell__inner { transition-duration: 1ms; }
+}

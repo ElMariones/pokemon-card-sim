@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Archive, BadgeCheck, BookOpen, PackageOpen, ScrollText, Store,
+  Archive, BadgeCheck, BookOpen, Gamepad2, PackageOpen, ScrollText, Store,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { money } from "@/lib/format";
@@ -29,6 +29,7 @@ const NAV: AppNavItem[] = [
   { href: "/sealed", label: "Sealed", icon: Archive },
   { href: "/grading", label: "Grading", icon: BadgeCheck },
   { href: "/missions", label: "Missions", icon: ScrollText },
+  { href: "/games", label: "Arcade", icon: Gamepad2 },
 ];
 
 export function AppHeader() {
@@ -37,12 +38,34 @@ export function AppHeader() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const canGoBack = pathname !== "/";
+  const ref = useRef<HTMLElement>(null);
+
+  /**
+   * Publish the header's height so anything else that sticks can clear it.
+   *
+   * The height is not a constant: the mobile nav row is part of the header
+   * below `sm`, and the level badge appears once the player has one. A page
+   * that hard-codes 67px gets its own sticky toolbar hidden underneath.
+   */
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty("--app-header-h", `${el.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <header className="border-seam/70 bg-ink/85 sticky top-0 z-40 border-b backdrop-blur-md">
+    <header
+      ref={ref}
+      className="border-seam/70 bg-ink/85 sticky top-0 z-40 border-b backdrop-blur-md"
+    >
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-5 py-2.5">
         <button
           type="button"
