@@ -50,7 +50,6 @@ export function SellMarket() {
   const { player, loading: playerLoading, refresh } = usePlayer();
   const [active, setActive] = useState<PlayerListing[]>([]);
   const [sold, setSold] = useState<PlayerSale[]>([]);
-  const [justSold, setJustSold] = useState<PlayerSale[]>([]);
   const [listing, setListing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +61,6 @@ export function SellMarket() {
         const data = await response.json();
         setActive(data.active ?? []);
         setSold(data.sold ?? []);
-        if (data.justSold?.length) { setJustSold(data.justSold); void refresh(); }
       } else setError("Could not check your stall");
     } catch {
       setError("Could not check your stall");
@@ -71,7 +69,7 @@ export function SellMarket() {
       // reading "Checking the display case…" for the life of the page.
       setLoading(false);
     }
-  }, [refresh]);
+  }, []);
 
   useEffect(() => {
     if (playerLoading || !player) return;
@@ -83,6 +81,11 @@ export function SellMarket() {
     const timer = setInterval(() => { void load(); }, 20_000);
     return () => clearInterval(timer);
   }, [active.length, load]);
+  useEffect(() => {
+    const onSale = () => { void load(); };
+    window.addEventListener("pcs:market-updated" as never, onSale as never);
+    return () => window.removeEventListener("pcs:market-updated" as never, onSale as never);
+  }, [load]);
 
   const cancel = async (listingId: string) => {
     setError(null);
@@ -104,18 +107,6 @@ export function SellMarket() {
       </div>
 
       {error && <p role="alert" className="mb-5 rounded-pane p-3 text-sm text-loss ring-1 ring-loss/40">{error}</p>}
-      {justSold.length > 0 && (
-        <div className="deal-success pane mb-6 border-brass-dim p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-brass">Your stall made a sale</p>
-              {justSold.map((sale) => <p key={sale.id} className="mt-1 text-xs text-manila-2">{sale.name} went to {sale.buyerName} for {money(sale.netProceeds as Cents)} after fees.</p>)}
-            </div>
-            <button type="button" onClick={() => setJustSold([])} className="text-xs text-manila-3 hover:text-manila">Dismiss</button>
-          </div>
-        </div>
-      )}
-
       <Summary active={active} sold={sold} />
 
       <section>

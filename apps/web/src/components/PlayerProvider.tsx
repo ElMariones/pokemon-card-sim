@@ -4,6 +4,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import type { Cents } from "@pcs/shared";
+import { SaleToasts, type SaleAlert } from "./SaleToasts";
 
 /**
  * Session state, held once for the whole app.
@@ -49,7 +50,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [progression, setProgression] = useState<Progression | null>(null);
   const [collectionCount, setCollectionCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [saleAlerts, setSaleAlerts] = useState<SaleAlert[]>([]);
   const refreshInFlight = useRef<Promise<void> | null>(null);
+  const marketCheckInFlight = useRef<Promise<void> | null>(null);
+  const seenSaleIds = useRef(new Set<string>());
   /** Whether /api/me has run once, i.e. whether the session cookie exists. */
   const bootstrapped = useRef(false);
 
@@ -122,12 +126,74 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPlayer((p) => (p ? { ...p, cash } : p));
   }, []);
 
+  const checkMarket = useCallback(async () => {
+    if (marketCheckInFlight.current || document.visibilityState === "hidden") {
+      return marketCheckInFlight.current ?? Promise.resolve();
+    }
+
+    const task = (async () => {
+      try {
+        const response = await fetch("/api/market/settle", { method: "POST" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const sales = (data.justSold ?? []) as Array<{
+          id: string; name: string; netProceeds: number; buyerName: string | null;
+        }>;
+
+        if (data.balanceAfter != null) setCash(data.balanceAfter as Cents);
+        const unseen = sales.filter((sale) => !seenSaleIds.current.has(sale.id));
+        if (unseen.length === 0) return;
+
+        for (const sale of unseen) seenSaleIds.current.add(sale.id);
+        setSaleAlerts((current) => [
+          ...current,
+          ...unseen.map((sale) => ({ ...sale, netProceeds: sale.netProceeds as Cents })),
+        ]);
+        window.dispatchEvent(new Event("pcs:market-updated"));
+        void refresh();
+      } catch {
+        // A background check should never interrupt the page the player is on.
+      }
+    })().finally(() => {
+      marketCheckInFlight.current = null;
+    });
+    marketCheckInFlight.current = task;
+    return task;
+  }, [refresh, setCash]);
+
+  // Marketplace visitors keep arriving while the player uses any screen. A
+  // lightweight shell poll settles them and immediately updates cash globally.
+  const playerId = player?.id;
+  useEffect(() => {
+    if (!playerId) return;
+    void checkMarket();
+    const timer = window.setInterval(() => { void checkMarket(); }, 10_000);
+    const onVisible = () => { if (document.visibilityState === "visible") void checkMarket(); };
+    const onDemand = () => { void checkMarket(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pcs:market-check" as never, onDemand as never);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pcs:market-check" as never, onDemand as never);
+    };
+  }, [checkMarket, playerId]);
+
+  const dismissSale = useCallback((id: string) => {
+    setSaleAlerts((current) => current.filter((sale) => sale.id !== id));
+  }, []);
+
   const value = useMemo(
     () => ({ player, progression, collectionCount, loading, refresh, setCash }),
     [player, progression, collectionCount, loading, refresh, setCash],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      {children}
+      <SaleToasts sales={saleAlerts} dismiss={dismissSale} />
+    </PlayerContext.Provider>
+  );
 }
 
 export function usePlayer(): PlayerContextValue {

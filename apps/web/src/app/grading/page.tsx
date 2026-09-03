@@ -41,6 +41,7 @@ export default function GradingPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const effectiveCash = player?.cash ?? null;
 
   const load = useCallback(async () => {
@@ -141,13 +142,36 @@ export default function GradingPage() {
   };
 
   const collect = async (gradeId: string) => {
-    const res = await fetch("/api/grading/collect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gradeId }),
-    });
-    if (res.ok) { await load(); void refresh(); }
+    setCollecting(true); setError(null);
+    try {
+      const res = await fetch("/api/grading/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gradeId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Could not collect grade"); return; }
+      await load();
+      void refresh();
+    } finally { setCollecting(false); }
   };
+
+  const collectAll = async () => {
+    setCollecting(true); setError(null);
+    try {
+      const res = await fetch("/api/grading/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectAll: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Could not collect grades"); return; }
+      await load();
+      void refresh();
+    } finally { setCollecting(false); }
+  };
+
+  const readyCount = submissions.filter((submission) => submission.status === "ready").length;
 
   return (
     <>
@@ -304,10 +328,22 @@ export default function GradingPage() {
         </section>
 
         <section>
-          <h2 className="t-display mb-4 text-lg tracking-tight">
-            Submissions{" "}
-            <span className="text-manila-3 t-num text-sm tabular-nums">{submissions.length}</span>
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="t-display text-lg tracking-tight">
+              Submissions{" "}
+              <span className="text-manila-3 t-num text-sm tabular-nums">{submissions.length}</span>
+            </h2>
+            {readyCount > 0 && (
+              <button
+                type="button"
+                onClick={collectAll}
+                disabled={collecting}
+                className="bg-brass text-ink hover:bg-brass-hot rounded-pane px-4 py-2 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60"
+              >
+                {collecting ? "Collecting…" : `Collect all ready (${readyCount})`}
+              </button>
+            )}
+          </div>
 
           {loading ? (
             <p className="text-manila-3 pane p-6 text-sm">Checking the grader…</p>
@@ -359,7 +395,8 @@ export default function GradingPage() {
                         <button
                           type="button"
                           onClick={() => collect(s.id)}
-                          className="bg-brass text-ink hover:bg-brass-hot shrink-0 rounded-pane px-3 py-2 text-xs font-semibold transition"
+                          disabled={collecting}
+                          className="bg-brass text-ink hover:bg-brass-hot shrink-0 rounded-pane px-3 py-2 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60"
                         >
                           Collect
                         </button>

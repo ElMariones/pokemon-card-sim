@@ -104,6 +104,15 @@ export default function FinancesPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const onSale = () => {
+      financeCache.clear();
+      void load();
+    };
+    window.addEventListener("pcs:market-updated" as never, onSale as never);
+    return () => window.removeEventListener("pcs:market-updated" as never, onSale as never);
+  }, [load]);
+
   const resetPage = (setter: (value: string) => void, value: string) => {
     setter(value);
     setPage("1");

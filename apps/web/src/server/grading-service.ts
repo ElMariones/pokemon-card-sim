@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, desc, notExists } from 'drizzle-orm';
+import { and, eq, desc, inArray, lte, notExists } from 'drizzle-orm';
 import { getDb, type Database } from '@pcs/db';
 import { grades, inventoryItems, cards, sets } from '@pcs/db/schema';
 import { cents, type Cents, type Condition } from '@pcs/shared';
@@ -318,8 +318,12 @@ export async function listSubmissions(userId: string): Promise<SubmissionView[]>
 }
 
 /** Take delivery of a finished grade; the card returns to the collection. */
-export async function collectGrade(userId: string, gradeId: string) {
-  const db = await getDb();
+export async function collectGrade(
+  userId: string,
+  gradeId: string,
+  database?: Database,
+) {
+  const db = database ?? await getDb();
 
   const [row] = await db
     .select({
@@ -341,24 +345,78 @@ export async function collectGrade(userId: string, gradeId: string) {
     throw new GameError('That card is still being graded', 'not_ready');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await db.transaction(async (tx: any) => {
-    await tx
-      .update(grades)
-      .set({ status: 'completed', completedAt: new Date() })
-      .where(eq(grades.id, gradeId));
-    await tx
-      .update(inventoryItems)
-      .set({ status: 'owned' })
-      .where(eq(inventoryItems.id, row.inventoryItemId));
-  });
+  const collected = await collectReadyGradeRows(userId, [gradeId], db);
+  if (collected.length === 0) {
+    throw new GameError('Already collected', 'already_collected');
+  }
 
-  return {
-    gradeId,
-    company: row.company,
-    numericGrade: row.numericGrade,
-    label: row.label,
-  };
+  return collected[0]!;
+}
+
+/** Collect every finished submission in one transaction. */
+export async function collectReadyGrades(
+  userId: string,
+  database?: Database,
+) {
+  const db = database ?? await getDb();
+  const collected = await collectReadyGradeRows(userId, null, db);
+  return { collectedCount: collected.length, grades: collected };
+}
+
+interface CollectedGrade {
+  gradeId: string;
+  company: string;
+  numericGrade: number | null;
+  label: string | null;
+}
+
+async function collectReadyGradeRows(
+  userId: string,
+  gradeIds: string[] | null,
+  db: Database,
+): Promise<CollectedGrade[]> {
+  const now = new Date();
+  const predicates = [
+    eq(grades.userId, userId),
+    eq(grades.status, 'queued'),
+    lte(grades.readyAt, now),
+  ];
+  if (gradeIds) predicates.push(inArray(grades.id, gradeIds));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return db.transaction(async (tx: any) => {
+    const claimed = await tx
+      .update(grades)
+      .set({ status: 'completed', completedAt: now })
+      .where(and(...predicates))
+      .returning({
+        gradeId: grades.id,
+        company: grades.gradeCompany,
+        numericGrade: grades.numericGrade,
+        label: grades.label,
+        inventoryItemId: grades.inventoryItemId,
+      });
+
+    if (claimed.length > 0) {
+      await tx
+        .update(inventoryItems)
+        .set({ status: 'owned' })
+        .where(inArray(inventoryItems.id, claimed.map((grade: { inventoryItemId: string }) => grade.inventoryItemId)));
+    }
+
+    return claimed.map((grade: {
+      gradeId: string;
+      company: string;
+      numericGrade: number | null;
+      label: string | null;
+      inventoryItemId: string;
+    }) => ({
+      gradeId: grade.gradeId,
+      company: grade.company,
+      numericGrade: grade.numericGrade,
+      label: grade.label,
+    }));
+  });
 }
 
 export const listServiceTiers = () =>

@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace=@pcs/web",
+    "dev:mock": "npm run dev:mock --workspace=@pcs/web",
     "build": "npm run build --workspace=@pcs/web",
     "start": "npm run start --workspace=@pcs/web",
     "lint": "npm run lint --workspace=@pcs/web",

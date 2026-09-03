@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, desc, sql, inArray } from 'drizzle-orm';
-import { getDb } from '@pcs/db';
-import { listings, inventoryItems, cards, sets, grades, users } from '@pcs/db/schema';
+import { and, eq, desc } from 'drizzle-orm';
+import { getDb, type Database } from '@pcs/db';
+import { listings, inventoryItems, cards, sets, grades } from '@pcs/db/schema';
 import { cents, type Cents, type RarityTier } from '@pcs/shared';
 import {
-  computePrice, gradedValue, dealerBuyOffer, applyTransaction,
-  resolveVisits, visitChance, expectedSecondsToSell, outlookFor, netProceeds,
+  computePrice, gradedValue, dealerBuyOffer, applyTransactionInTx,
+  resolveVisits, expectedSecondsToSell, outlookFor, netProceeds,
   CLIENT_INTERVAL_SECONDS, OUTLOOK_LABEL,
 } from '@pcs/economy-engine';
 import { GameError } from './game';
@@ -57,12 +57,12 @@ export interface SoldView {
 }
 
 /** Current market value of one inventory item, grade included. */
-async function valueOf(inventoryItemId: string): Promise<{
+async function valueOf(inventoryItemId: string, database?: Database): Promise<{
   value: Cents;
   cardId: string;
   rarityTier: RarityTier;
 } | null> {
-  const db = await getDb();
+  const db = database ?? await getDb();
   const [row] = await db
     .select({
       cardId: cards.id,
@@ -106,8 +106,17 @@ async function valueOf(inventoryItemId: string): Promise<{
  * Runs before any market read. Each sale pays out through the ledger like any
  * other money movement.
  */
-export async function settleMarket(userId: string): Promise<SoldView[]> {
-  const db = await getDb();
+export interface MarketSettlement {
+  justSold: SoldView[];
+  /** Authoritative balance after the last sale, or null when nothing sold. */
+  balanceAfter: Cents | null;
+}
+
+export async function settleMarket(
+  userId: string,
+  database?: Database,
+): Promise<MarketSettlement> {
+  const db = database ?? await getDb();
   const now = new Date();
 
   const active = await db
@@ -128,6 +137,7 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
     .where(and(eq(listings.userId, userId), eq(listings.status, 'active')));
 
   const justSold: SoldView[] = [];
+  let balanceAfter: Cents | null = null;
 
   for (const l of active) {
     const elapsed = (now.getTime() - new Date(l.lastCheckedAt).getTime()) / 1000;
@@ -136,7 +146,7 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
     // Value is re-read rather than trusted from listing time: the market moves,
     // and a card that has appreciated should become easier to sell, not stay
     // pinned to the ratio it had when it was listed.
-    const current = await valueOf(l.inventoryItemId);
+    const current = await valueOf(l.inventoryItemId, db);
     const marketValue = current?.value ?? cents(l.marketValueAtListing);
 
     const result = resolveVisits({
@@ -161,9 +171,12 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
     const price = cents(l.askPrice);
     const { fee, net } = netProceeds(price);
 
+    // Claim and pay for the sale in one transaction. The status predicate is
+    // the concurrency guard: if the persistent shell and another request
+    // settle together, only one can move this active listing to sold.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await db.transaction(async (tx: any) => {
-      await tx
+    const settlement = await db.transaction(async (tx: any) => {
+      const claimed = await tx
         .update(listings)
         .set({
           status: 'sold',
@@ -175,29 +188,35 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
           buyerName: result.sold!.buyer.name,
           buyerNote: result.sold!.buyer.note,
         })
-        .where(eq(listings.id, l.id));
+        .where(and(eq(listings.id, l.id), eq(listings.status, 'active')))
+        .returning({ id: listings.id });
+
+      if (claimed.length === 0) return null;
 
       await tx
         .update(inventoryItems)
         .set({ status: 'sold' })
         .where(eq(inventoryItems.id, l.inventoryItemId));
+
+      return applyTransactionInTx(tx, {
+        userId,
+        type: 'card_sale',
+        amount: net,
+        itemType: 'listing',
+        itemId: l.id,
+        metadata: {
+          via: 'marketplace',
+          askPrice: price,
+          fee,
+          buyer: result.sold!.buyer.name,
+          marketValue,
+        },
+      });
     });
 
-    await applyTransaction(db as never, {
-      userId,
-      type: 'card_sale',
-      amount: net,
-      itemType: 'listing',
-      itemId: l.id,
-      metadata: {
-        via: 'marketplace',
-        askPrice: price,
-        fee,
-        buyer: result.sold.buyer.name,
-        marketValue,
-      },
-    });
-    await grantXp(userId, 'card_sold');
+    if (!settlement) continue;
+    balanceAfter = settlement.balanceAfter;
+    await grantXp(userId, 'card_sold', 1, db);
 
     justSold.push({
       id: l.id,
@@ -214,7 +233,7 @@ export async function settleMarket(userId: string): Promise<SoldView[]> {
     });
   }
 
-  return justSold;
+  return { justSold, balanceAfter };
 }
 
 export async function listActive(userId: string): Promise<ListingView[]> {

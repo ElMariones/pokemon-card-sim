@@ -1,5 +1,5 @@
 import { and, eq, gte, sql } from 'drizzle-orm';
-import { getDb } from '@pcs/db';
+import { getDb, type Database } from '@pcs/db';
 import { randomUUID } from 'node:crypto';
 import { users, openings, transactions, inventoryItems, cards, grades, missions as missionsTable } from '@pcs/db/schema';
 import {
@@ -174,16 +174,22 @@ export async function getProgression(userId: string): Promise<ProgressionView> {
  * derived from total XP, so this is safe to call repeatedly without the level
  * and the XP getting out of step.
  */
-export async function grantXp(userId: string, reason: XpReason, count = 1) {
-  return grantXpMany(userId, [{ reason, count }]);
+export async function grantXp(
+  userId: string,
+  reason: XpReason,
+  count = 1,
+  db?: Database,
+) {
+  return grantXpMany(userId, [{ reason, count }], db);
 }
 
 /** Apply several awards with one read/write pair after a compound game action. */
 export async function grantXpMany(
   userId: string,
   awards: readonly { reason: XpReason; count: number }[],
+  database?: Database,
 ) {
-  const db = await getDb();
+  const db = database ?? await getDb();
   const [user] = await db.select({ xp: users.xp }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user) return null;
 

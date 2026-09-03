@@ -70,7 +70,7 @@ async function main() {
   for (; rounds < 40 && !sold; rounds++) {
     await windBack(CLIENT_INTERVAL_SECONDS * 20); // 20 visitors per round
     const results = await settleMarket(userId);
-    sold = results[0] ?? null;
+    sold = results.justSold[0] ?? null;
   }
 
   if (!sold) throw new Error('A 120% listing never sold — "eventually" is broken');

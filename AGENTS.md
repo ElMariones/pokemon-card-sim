@@ -31,14 +31,22 @@ These are enforced by review, and they matter:
 
 ## Database
 
-Dev uses PGlite (Postgres in WebAssembly, persisted to `data/pgdata`). No Docker
-needed. Setting `DATABASE_URL` switches to Neon with no code change, because the
-dialect is identical.
+Supabase project `ckrybfpctqqrijrvmnhb` is the canonical database. Agents have
+authenticated Supabase tooling for that project and must inspect the live schema
+before database work. Every approved schema or data change must be applied to
+Supabase and verified there; committing local SQL alone is not completion.
+
+Normal localhost development uses that confirmed Supabase database. Put its
+Postgres connection string in the ignored repository-root `.env.local` as
+`DATABASE_URL`, then run `npm run dev`. Isolated tests may instead use the
+explicit mock command `npm run dev:mock`, which uses PGlite. Never test against
+an accidental or unconfirmed third database. See `docs/DATABASE.md`.
 
 ```bash
 npm run db:push      # create tables
 npm run data:all     # import catalogue + prices
-npm run dev
+npm run dev          # confirmed Supabase only
+npm run dev:mock     # explicit local PGlite database
 ```
 
 ### PGlite is single-process. This will bite you.

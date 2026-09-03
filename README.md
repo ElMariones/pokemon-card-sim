@@ -65,7 +65,7 @@ Three additional seeded runs completed successfully before this showcase pull, p
 | Web app | Next.js 16, React 19, TypeScript | App Router UI with server route handlers for game actions. |
 | UI & motion | Tailwind CSS 4, Framer Motion, GSAP, Lucide | A responsive vitrine-style interface with tactile pack and card interactions. |
 | Data layer | Drizzle ORM, PostgreSQL | Typed schema, migrations, and portable SQL. |
-| Local / production database | PGlite / Neon | Local Postgres in WebAssembly; switch to Neon with `DATABASE_URL` and no query rewrite. |
+| Database | Supabase Postgres, PGlite for isolated mocks | Normal localhost and production share the confirmed Supabase schema; PGlite is an explicit test-only alternative. |
 | Card catalogue & pricing | Pokémon TCG Data bulk JSON and Pokémon TCG API | Set metadata, card records, image references, and market inputs. |
 | Game engines | Workspace TypeScript packages | Pack simulation and economy rules stay pure, deterministic, and independently testable. |
 | Quality checks | Vitest and a 100k-opening simulation harness | Unit coverage for rules plus statistical validation of pack distributions. |

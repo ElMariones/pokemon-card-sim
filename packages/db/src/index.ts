@@ -37,7 +37,29 @@ const CACHE_KEY = Symbol.for('pcs.db.connection');
 type GlobalWithDb = typeof globalThis & { [CACHE_KEY]?: Promise<Database> };
 const globalRef = globalThis as GlobalWithDb;
 
-export const isPgliteMode = () => !process.env.DATABASE_URL;
+export const CONFIRMED_SUPABASE_PROJECT_REF = 'ckrybfpctqqrijrvmnhb';
+
+/** Reject a credential for a different remote database before game data moves. */
+export function assertConfirmedSupabaseUrl(databaseUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error('DATABASE_URL is not a valid Postgres connection URL.');
+  }
+
+  const direct = parsed.hostname === `db.${CONFIRMED_SUPABASE_PROJECT_REF}.supabase.co`;
+  const pooled = parsed.hostname.endsWith('.pooler.supabase.com') &&
+    decodeURIComponent(parsed.username).endsWith(`.${CONFIRMED_SUPABASE_PROJECT_REF}`);
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || (!direct && !pooled)) {
+    throw new Error(
+      `DATABASE_URL must point to the confirmed Supabase project ${CONFIRMED_SUPABASE_PROJECT_REF}.`,
+    );
+  }
+}
+
+export const isPgliteMode = () =>
+  process.env.DATABASE_MODE === 'mock' || !process.env.DATABASE_URL;
 
 /**
  * What is cached is the *promise*, not the resolved connection.
@@ -53,7 +75,13 @@ export const isPgliteMode = () => !process.env.DATABASE_URL;
  */
 async function openDb(): Promise<Database> {
   const url = process.env.DATABASE_URL;
-  if (url) {
+  if (process.env.DATABASE_MODE === 'supabase' && !url) {
+    throw new Error(
+      'DATABASE_MODE=supabase requires DATABASE_URL. Use npm run dev:mock for isolated PGlite testing.',
+    );
+  }
+  if (url && process.env.DATABASE_MODE !== 'mock') {
+    assertConfirmedSupabaseUrl(url);
     const { Pool } = await import('@neondatabase/serverless');
     return drizzleNeon(new Pool({ connectionString: url }), { schema });
   }
