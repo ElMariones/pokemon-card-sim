@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARTWORK_DEX, COSMETICS, FLAPPY_SPRITES, MINIGAME_IDS, cosmeticById, cosmeticImage,
-  cosmeticsForGame, defaultCosmeticFor,
+  ARTWORK_DEX, COSMETICS, FLAPPY_SPRITES, MINIGAME_IDS, SNAKE_ROSTER, SNAKE_SPRITES,
+  cosmeticById, cosmeticImage, cosmeticsForGame, defaultCosmeticFor,
 } from './index';
 
 describe('the cosmetics catalogue', () => {
@@ -51,10 +51,15 @@ describe('the cosmetics catalogue', () => {
     expect([...ARTWORK_DEX].sort()).toEqual([...new Set(drawn)].sort());
   });
 
-  it('gives every flappy cosmetic a sprite to render', () => {
-    for (const c of cosmeticsForGame('flappy')) {
+  it('gives every flappy and snake cosmetic a sprite to render', () => {
+    for (const c of [...cosmeticsForGame('flappy'), ...cosmeticsForGame('snake')]) {
       expect(c.sprite).toBeTruthy();
     }
+  });
+
+  it('asks the importer for every Pokémon that can stand in the snake line', () => {
+    for (const dex of SNAKE_ROSTER) expect(SNAKE_SPRITES).toContain(dex);
+    for (const c of cosmeticsForGame('snake')) expect(SNAKE_SPRITES).toContain(c.sprite);
   });
 
   it('gives every cosmetic a palette, so nothing renders unthemed', () => {

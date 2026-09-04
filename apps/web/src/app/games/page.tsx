@@ -47,6 +47,13 @@ const MACHINES: Record<MinigameId, {
     scoring: "Pays on a clean board. Moves cost more than seconds.",
     bestLabel: "Best board",
   },
+  snake: {
+    name: "Pokémon Parade",
+    href: "/games/snake",
+    tagline: "Snake, but the snake is a queue of Pokémon.",
+    scoring: "Pays per point. A Pokémon joining is ten; a berry is four.",
+    bestLabel: "Best parade",
+  },
   type: {
     name: "Speed Type",
     href: "/games/type",
@@ -57,7 +64,7 @@ const MACHINES: Record<MinigameId, {
 };
 
 /** The order they stand on the floor. */
-const FLOOR: MinigameId[] = ["flappy", "match", "type"];
+const FLOOR: MinigameId[] = ["flappy", "snake", "match", "type"];
 
 export default function GamesPage() {
   const [view, setView] = useState<ArcadeView | null>(null);
@@ -98,7 +105,7 @@ export default function GamesPage() {
         <div>
           <h1 className="t-display mb-1 text-2xl tracking-tight">Arcade</h1>
           <p className="text-manila-2 max-w-xl text-sm">
-            Three machines in the corner of the shop. They pay real money into the same
+            Four machines in the corner of the shop. They pay real money into the same
             wallet that buys packs — capped, so the arcade stays a side income rather than
             a better one.
           </p>
@@ -141,7 +148,7 @@ export default function GamesPage() {
       {loading && <p className="text-manila-3 pane p-6 text-sm">Warming up the machines…</p>}
 
       {view && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {FLOOR.map((game) => {
             const machine = MACHINES[game];
             const stats = view.games.find((g) => g.game === game);
@@ -195,6 +202,45 @@ function CabinetScreen({ game, cosmetic }: { game: MinigameId; cosmetic?: Cosmet
           <span className="stack stack--bottom !relative !w-7" style={{ height: 52 }} />
           <span className="stack stack--bottom !relative !w-7" style={{ height: 24 }} />
         </div>
+      </div>
+    );
+  }
+
+  if (game === "snake") {
+    // The leader at the front of a short line, all walking right.
+    const followers = [133, 7, 39];
+    return (
+      <div className="cabinet-meadow absolute inset-0">
+        <div className="absolute inset-x-0 bottom-[32%] flex items-end justify-center">
+          {[...followers].reverse().map((dex, i) => (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              key={dex}
+              src={`/sprites/pokemon/${dex}.gif`}
+              alt=""
+              width={96}
+              height={96}
+              className="pixel h-11 w-11 -scale-x-100 object-contain"
+              style={{ marginRight: -6, opacity: 0.8 + i * 0.06 }}
+            />
+          ))}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/sprites/pokemon/${cosmetic?.sprite ?? 25}.gif`}
+            alt=""
+            width={96}
+            height={96}
+            className="pixel sprite-bob h-14 w-14 -scale-x-100 object-contain"
+          />
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/sprites/items/oran-berry.png"
+          alt=""
+          width={30}
+          height={30}
+          className="pixel absolute right-[14%] top-[22%] h-6 w-6"
+        />
       </div>
     );
   }

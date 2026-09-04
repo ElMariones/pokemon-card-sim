@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  * How a cosmetic is drawn, wherever it is drawn.
  *
  * The shop, the cabinet on the arcade floor and the game itself all have to
- * render the same three things — a bird, a card back, a backdrop — and the
+ * render the same few things — a bird, a parade leader, a card back, a backdrop — and the
  * whole promise of the shop is that the preview is the real thing. Keeping the
  * markup in one place is what makes that true: there is no second version of a
  * card back that could drift from the one you flip.
@@ -82,7 +82,7 @@ export function TypeBackdrop({ cosmetic }: { cosmetic?: Drawable }) {
 export function CosmeticPreview({ cosmetic, owned }: { cosmetic: Drawable; owned: boolean }) {
   const dimmed = owned ? "" : "cosmetic-locked";
 
-  if (cosmetic.game === "flappy") {
+  if (cosmetic.game === "flappy" || cosmetic.game === "snake") {
     const src = cosmeticImage(cosmetic as Cosmetic);
     return (
       // The mirror lives on the wrapper, not on the image: the idle bob is a

@@ -1,4 +1,6 @@
-import { MATCH_PAIRS, type MinigameContent } from './content';
+import {
+  MATCH_PAIRS, SNAKE_MIN_TICK_MS, SNAKE_POINTS_POKEMON, type MinigameContent,
+} from './content';
 import type { MinigameId } from './types';
 
 /**
@@ -28,6 +30,15 @@ export const MATCH_MAX_SCORE = 1_000;
 const TYPE_MAX_WPM = 250;
 /** The conventional definition of a "word" for typing speed. */
 const CHARS_PER_WORD = 5;
+
+/**
+ * A pickup is never nearer than a few cells, and the line cannot cross a cell
+ * faster than the tightest tick. Both are set well under what real play
+ * manages, because the ceiling only has to refuse the impossible.
+ */
+const SNAKE_MIN_TICKS_PER_PICKUP = 3;
+/** Whatever was within reach in the first second of a run. */
+const SNAKE_GRACE_PICKUPS = 3;
 
 /** A slow page load or a slow network sits between the two clocks. */
 const CLOCK_SLACK_MS = 2_000;
@@ -76,6 +87,13 @@ export function verifyClaim(input: ClaimInput): ClaimVerdict {
       if (score > content.length) return reject('type_score_exceeds_passage_length');
       const maxChars = (TYPE_MAX_WPM * CHARS_PER_WORD * budget) / 60_000;
       if (score > maxChars) return reject('type_score_exceeds_human_wpm');
+      return { ok: true };
+    }
+
+    case 'snake': {
+      const pickups =
+        Math.floor(budget / (SNAKE_MIN_TICK_MS * SNAKE_MIN_TICKS_PER_PICKUP)) + SNAKE_GRACE_PICKUPS;
+      if (score > pickups * SNAKE_POINTS_POKEMON) return reject('snake_score_exceeds_tick_rate');
       return { ok: true };
     }
   }

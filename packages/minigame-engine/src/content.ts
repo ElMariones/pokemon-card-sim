@@ -33,7 +33,38 @@ export interface TypeContent {
   length: number;
 }
 
-export type MinigameContent = MatchContent | FlappyContent | TypeContent;
+/**
+ * The Pokémon that wander onto the Snake board and join the line.
+ *
+ * Dex numbers, because that is what names both GIFs a follower needs — the
+ * front sprite for walking down or sideways, the back sprite for walking up.
+ * Deliberately small and deliberately Kanto-heavy: these are the ones a
+ * collector recognises at 30 pixels.
+ */
+export const SNAKE_ROSTER: readonly number[] = [
+  1, 4, 7, 39, 52, 54, 58, 66, 43, 129, 133, 143, 94, 175, 393, 35, 37, 147,
+];
+
+export const SNAKE_COLS = 24;
+export const SNAKE_ROWS = 15;
+/** The fastest the line ever moves, one cell per tick. The ceiling depends on it. */
+export const SNAKE_MIN_TICK_MS = 95;
+export const SNAKE_POINTS_POKEMON = 10;
+export const SNAKE_POINTS_BERRY = 4;
+
+export interface SnakeContent {
+  kind: 'snake';
+  cols: number;
+  rows: number;
+  /**
+   * Which Pokémon appears, in order: indexes into SNAKE_ROSTER. Where it
+   * appears cannot come from the seed — a free cell depends on where the line
+   * is — so the client rolls that from the same stream, past this list.
+   */
+  visitors: number[];
+}
+
+export type MinigameContent = MatchContent | FlappyContent | TypeContent | SnakeContent;
 
 function buildMatch(rng: Rng): MatchContent {
   const cells: number[] = [];
@@ -61,11 +92,18 @@ function buildType(rng: Rng): TypeContent {
   return { kind: 'type', passage, length: passage.length };
 }
 
+function buildSnake(rng: Rng): SnakeContent {
+  const visitors: number[] = [];
+  for (let i = 0; i < 300; i++) visitors.push(Math.floor(rng() * SNAKE_ROSTER.length));
+  return { kind: 'snake', cols: SNAKE_COLS, rows: SNAKE_ROWS, visitors };
+}
+
 export function buildContent(game: MinigameId, seed: string): MinigameContent {
   const rng = seedRng(seed);
   switch (game) {
     case 'match': return buildMatch(rng);
     case 'flappy': return buildFlappy(rng);
     case 'type': return buildType(rng);
+    case 'snake': return buildSnake(rng);
   }
 }

@@ -317,6 +317,126 @@
 .stack--top::after { bottom: -2px; }
 .stack--bottom::after { top: -2px; }
 
+/* ---------------------------------------------------------------------------
+   The Meadow.
+
+   Pokémon Parade is played on a 24x15 grid of 30px cells. The grid is drawn as
+   a checkerboard of two greens rather than as lines, because a line grid reads
+   as a spreadsheet and a checkerboard reads as a lawn — and because it makes a
+   cell's position legible without a stroke that would alias under the
+   playfield's fractional scale.
+   --------------------------------------------------------------------------- */
+
+.playfield--meadow {
+  background: #6fb85a;
+  /* A swipe is a turn, not a scroll. */
+  touch-action: none;
+}
+
+.meadow-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, #64ad51 25%, transparent 25%, transparent 75%, #64ad51 75%),
+    linear-gradient(45deg, #64ad51 25%, transparent 25%, transparent 75%, #64ad51 75%);
+  background-size: 60px 60px;
+  background-position: 0 0, 30px 30px;
+  box-shadow: inset 0 0 0 3px #3f7f34, inset 0 0 40px rgba(20, 60, 20, 0.35);
+  pointer-events: none;
+}
+
+.meadow-mon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  object-fit: contain;
+  will-change: transform;
+  filter: drop-shadow(0 2px 0 rgba(20, 60, 20, 0.35));
+}
+
+/* Wild ones bounce a little, so the eye finds the next pickup. */
+.meadow-visitor {
+  animation: meadow-hop 0.9s ease-in-out infinite;
+}
+
+@keyframes meadow-hop {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -5px; }
+}
+
+.meadow-berry {
+  position: absolute;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 0 rgba(20, 60, 20, 0.35));
+  animation: meadow-twinkle 1.4s ease-in-out infinite;
+}
+
+@keyframes meadow-twinkle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+/* The floating "+10" over a pickup. */
+.meadow-pop {
+  position: absolute;
+  z-index: 100;
+  transform: translate(-50%, 0);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+  animation: meadow-pop 720ms ease-out forwards;
+  pointer-events: none;
+}
+
+.meadow-pop--join { color: #fff6d0; }
+.meadow-pop--berry { color: #ffd0e0; }
+
+@keyframes meadow-pop {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, -34px); }
+}
+
+/* The touch d-pad below the field. */
+.dpad {
+  display: grid;
+  width: 138px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.dpad__btn {
+  display: grid;
+  place-items: center;
+  height: 42px;
+  border-radius: 8px;
+  background: var(--color-vitrine-3);
+  color: var(--color-manila);
+  box-shadow: inset 0 0 0 1px var(--color-seam);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.dpad__btn:active {
+  background: color-mix(in oklab, var(--cab) 35%, var(--color-vitrine-3));
+}
+
+.dpad__btn--up { grid-column: 2; grid-row: 1; }
+.dpad__btn--left { grid-column: 1; grid-row: 2; }
+.dpad__btn--right { grid-column: 3; grid-row: 2; }
+.dpad__btn--down { grid-column: 2; grid-row: 3; }
+
+.cabinet-meadow {
+  background:
+    linear-gradient(45deg, #64ad51 25%, transparent 25%, transparent 75%, #64ad51 75%),
+    linear-gradient(45deg, #64ad51 25%, transparent 25%, transparent 75%, #64ad51 75%),
+    #6fb85a;
+  background-size: 28px 28px, 28px 28px, auto;
+  background-position: 0 0, 14px 14px, 0 0;
+}
+
 /* --- Card Match ----------------------------------------------------------- */
 
 .match-grid {
@@ -623,6 +743,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sprite-bob { animation: none; }
+  .meadow-visitor, .meadow-berry { animation: none; }
   .cabinet, .cosmetic { transition: none; }
   .cabinet:hover, .cosmetic:hover { transform: none; }
   .match-cell__inner { transition-duration: 1ms; }

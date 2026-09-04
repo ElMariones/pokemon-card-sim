@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATCH_PAIRS, buildContent, seedRng } from './index';
+import { MATCH_PAIRS, SNAKE_ROSTER, buildContent, seedRng } from './index';
 
 describe('seedRng', () => {
   it('produces the same stream for the same seed', () => {
@@ -17,7 +17,7 @@ describe('buildContent — the load-bearing determinism', () => {
   // The whole verification scheme rests on the server being able to rebuild
   // exactly what the client played. If this drifts, cheating becomes free.
   it('rebuilds identical content from the same seed for every game', () => {
-    for (const game of ['match', 'flappy', 'type'] as const) {
+    for (const game of ['match', 'flappy', 'type', 'snake'] as const) {
       expect(buildContent(game, 'seed-xyz')).toEqual(buildContent(game, 'seed-xyz'));
     }
   });
@@ -70,5 +70,18 @@ describe('type content', () => {
     const content = buildContent('type', 'passage-2');
     if (content.kind !== 'type') throw new Error('wrong kind');
     expect(content.passage).not.toMatch(/ {2}/);
+  });
+});
+
+describe('snake content', () => {
+  it('names a long queue of visitors, every one of them in the roster', () => {
+    const content = buildContent('snake', 'line-1');
+    if (content.kind !== 'snake') throw new Error('wrong kind');
+    expect(content.visitors.length).toBeGreaterThanOrEqual(200);
+    for (const v of content.visitors) {
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(SNAKE_ROSTER.length);
+    }
   });
 });

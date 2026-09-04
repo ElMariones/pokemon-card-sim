@@ -1,5 +1,6 @@
 import { cents, type Cents } from '@pcs/shared';
 import type { MinigameId } from './types';
+import { SNAKE_ROSTER } from './content';
 
 /**
  * Everything the arcade sells.
@@ -25,8 +26,9 @@ export interface Cosmetic {
   blurb: string;
   price: Cents;
   /**
-   * Dex number of the animated battle sprite the player flies. Flappy only.
-   * Names the GIF `data:sprites` downloads into public/sprites/pokemon.
+   * Dex number of the animated battle sprite the player plays as. Flappy and
+   * Snake. Names the GIF `data:sprites` downloads into public/sprites/pokemon
+   * (and, for Snake, the back sprite under public/sprites/pokemon/back).
    */
   sprite?: number;
   /**
@@ -75,6 +77,36 @@ export const COSMETICS: readonly Cosmetic[] = [
     id: 'flappy-rayquaza', game: 'flappy', name: 'Rayquaza',
     blurb: 'Sky high, in every sense.',
     price: cents(50_000), sprite: 384, palette: ['#5ac888', '#1a5a3a'],
+  },
+
+  // --- Snake: who leads the line -----------------------------------------
+  //
+  // The leader needs a back sprite as well as a front one, so it can face up
+  // the board; every follower drawn from SNAKE_ROSTER needs the same.
+  {
+    id: 'snake-pikachu', game: 'snake', name: 'Pikachu',
+    blurb: 'Out in front, as usual.',
+    price: cents(0), sprite: 25, palette: ['#f2cb45', '#8a6a2a'],
+  },
+  {
+    id: 'snake-eevee', game: 'snake', name: 'Eevee',
+    blurb: 'Leads, then evolves into whoever follows.',
+    price: cents(3_500), sprite: 133, palette: ['#c99a63', '#6d4a2a'],
+  },
+  {
+    id: 'snake-squirtle', game: 'snake', name: 'Squirtle',
+    blurb: 'Squad goals.',
+    price: cents(7_000), sprite: 7, palette: ['#6cb8e0', '#2a5a7a'],
+  },
+  {
+    id: 'snake-gengar', game: 'snake', name: 'Gengar',
+    blurb: 'The line behind it is not entirely willing.',
+    price: cents(15_000), sprite: 94, palette: ['#8a6fc4', '#3d2f6a'],
+  },
+  {
+    id: 'snake-snorlax', game: 'snake', name: 'Snorlax',
+    blurb: 'Slow-looking. Is not.',
+    price: cents(30_000), sprite: 143, palette: ['#5f7fa6', '#2d3d55'],
   },
 
   // --- Match: the back of the card --------------------------------------
@@ -138,8 +170,19 @@ export const COSMETICS: readonly Cosmetic[] = [
  * shop rather than anything that raises.
  */
 export const FLAPPY_SPRITES: readonly number[] = [
-  ...new Set(COSMETICS.flatMap((c) => (c.sprite ? [c.sprite] : []))),
+  ...new Set(COSMETICS.flatMap((c) => (c.game === 'flappy' && c.sprite ? [c.sprite] : []))),
 ];
+
+/** Snake needs both faces of everything that can be in the line: leaders and visitors. */
+export const SNAKE_SPRITES: readonly number[] = [
+  ...new Set([
+    ...COSMETICS.flatMap((c) => (c.game === 'snake' && c.sprite ? [c.sprite] : [])),
+    ...SNAKE_ROSTER,
+  ]),
+];
+
+/** The berries Snake scatters, as PokeAPI item sprite names. */
+export const SNAKE_BERRIES = ['oran-berry', 'cheri-berry', 'pecha-berry', 'sitrus-berry'] as const;
 
 export const ARTWORK_DEX: readonly number[] = [
   ...new Set(COSMETICS.flatMap((c) => (c.artwork ? [c.artwork] : []))),

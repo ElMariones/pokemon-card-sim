@@ -19,7 +19,7 @@ A Pokémon TCG collection simulator built around pack opening, card ownership, t
 - **Card market:** persistent NPC dealers, rotating stock, graded cards, negotiation, counteroffers, anger, and card-plus-cash trades.
 - **Player sales:** listings, fees, buyer visits, sale history, and server-settled proceeds.
 - **Grading and sealed products:** service tiers, turnaround times, server-decided grades, sealed inventory, and hold-or-open decisions.
-- **Arcade:** Flappy Pokémon, Card Match, and Speed Type with cosmetics, verified runs, and a shared daily earnings cap.
+- **Arcade:** Flappy Pokémon, Pokémon Parade (snake), Card Match, and Speed Type with cosmetics, verified runs, and a shared daily earnings cap.
 - **Progression:** XP, collector levels, missions, rewards, and a finance dashboard backed by the transaction ledger.
 
 ## Tech

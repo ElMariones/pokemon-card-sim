@@ -41,6 +41,17 @@ describe('verifyClaim — flappy', () => {
   });
 });
 
+describe('verifyClaim — snake', () => {
+  it('accepts a long, greedy line', () => {
+    // 40 Pokémon and a pile of berries in two minutes is a very good run.
+    expect(verifyClaim(claim('snake', 520, 120_000)).ok).toBe(true);
+  });
+
+  it('rejects more pickups than the tick rate allows', () => {
+    expect(verifyClaim(claim('snake', 2_000, 5_000)).ok).toBe(false);
+  });
+});
+
 describe('verifyClaim — match', () => {
   it('accepts a fast, clean board', () => {
     expect(verifyClaim(claim('match', 850, 40_000)).ok).toBe(true);
