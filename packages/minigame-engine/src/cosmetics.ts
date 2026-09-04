@@ -13,9 +13,10 @@ import type { MinigameId } from './types';
  *
  * Every item is a picture of a Pokémon, because that is what the arcade is
  * decorating: the bird you fly, the back of the card you flip, the art behind
- * the passage you type. The three `art*` fields below say which picture, and
- * they are the only thing the UI needs in order to render an item — a palette
- * is there to tint the furniture around it, never to stand in for it.
+ * the passage you type, the head of the parade you lead. The three `art*`
+ * fields below say which picture, and they are the only thing the UI needs in
+ * order to render an item — a palette is there to tint the furniture around
+ * it, never to stand in for it.
  */
 
 export interface Cosmetic {
@@ -25,8 +26,9 @@ export interface Cosmetic {
   blurb: string;
   price: Cents;
   /**
-   * Dex number of the animated battle sprite the player flies. Flappy only.
-   * Names the GIF `data:sprites` downloads into public/sprites/pokemon.
+   * Dex number of an animated battle sprite: the bird the player flies, or
+   * the head of the snake's parade. Flappy and snake only. Names the GIF
+   * `data:sprites` downloads into public/sprites/pokemon.
    */
   sprite?: number;
   /**
@@ -129,15 +131,51 @@ export const COSMETICS: readonly Cosmetic[] = [
     blurb: 'Typing at altitude.',
     price: cents(28_000), artwork: 384, palette: ['#5ac888', '#1a5a3a'],
   },
+
+  // --- Snake: who leads the parade ----------------------------------------
+  //
+  // The head of the snake is the one Pokémon you choose; everything that
+  // joins the tail comes from the meadow's own roster (see SNAKE_WILD_DEX).
+  {
+    id: 'snake-ekans', game: 'snake', name: 'Ekans',
+    blurb: 'Born to slither at the front.',
+    price: cents(0), sprite: 23, palette: ['#a06ec8', '#54307a'],
+  },
+  {
+    id: 'snake-arbok', game: 'snake', name: 'Arbok',
+    blurb: 'The parade has never been safer.',
+    price: cents(2_500), sprite: 24, palette: ['#c05aa8', '#6a2a55'],
+  },
+  {
+    id: 'snake-dratini', game: 'snake', name: 'Dratini',
+    blurb: 'Small now. Imagine the tail later.',
+    price: cents(6_000), sprite: 147, palette: ['#7fbde8', '#2f5c86'],
+  },
+  {
+    id: 'snake-dragonair', game: 'snake', name: 'Dragonair',
+    blurb: 'It glides, and the meadow notices.',
+    price: cents(12_000), sprite: 148, palette: ['#8fc4ee', '#33639a'],
+  },
+  {
+    id: 'snake-gyarados', game: 'snake', name: 'Gyarados',
+    blurb: 'Not a snake. Nobody tells it that.',
+    price: cents(25_000), sprite: 130, palette: ['#5aa8d8', '#2a5a7a'],
+  },
+  {
+    id: 'snake-rayquaza', game: 'snake', name: 'Rayquaza',
+    blurb: 'The tail it leads could touch the sky.',
+    price: cents(50_000), sprite: 384, palette: ['#5ac888', '#1a5a3a'],
+  },
 ];
 
 /**
- * The dex ids each importer fetches, derived from the catalogue rather than
- * listed beside it. A hand-kept second list is a list that eventually
+ * The dex ids the sprite importer fetches, derived from the catalogue rather
+ * than listed beside it. A hand-kept second list is a list that eventually
  * disagrees with the first, and the failure would be a missing image in the
- * shop rather than anything that raises.
+ * shop rather than anything that raises. The snake meadow's wild roster adds
+ * its own ids on top of these; see content.ts.
  */
-export const FLAPPY_SPRITES: readonly number[] = [
+export const SPRITE_DEX: readonly number[] = [
   ...new Set(COSMETICS.flatMap((c) => (c.sprite ? [c.sprite] : []))),
 ];
 

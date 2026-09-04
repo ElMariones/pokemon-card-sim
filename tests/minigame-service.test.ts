@@ -40,6 +40,16 @@ describe('startRun', () => {
     expect(run.content.kind).toBe('type');
   });
 
+  it('opens a snake run with a seeded snack stream and the free head', async () => {
+    const run = await startRun(USER, 'snake', db);
+    expect(run.content.kind).toBe('snake');
+    if (run.content.kind === 'snake') {
+      expect(run.content.foods.length).toBeGreaterThan(200);
+    }
+    expect(run.equipped.id).toBe('snake-ekans');
+    expect(run.equipped.sprite).toBe(23);
+  });
+
   it('equips the free default when the player owns nothing', async () => {
     const run = await startRun(USER, 'flappy', db);
     expect(run.equipped.id).toBe('flappy-pidgey');
@@ -154,6 +164,28 @@ describe('settleRun', () => {
     const [row] = await db.select().from(minigameRuns).where(eq(minigameRuns.id, run.runId));
     expect(row?.status).toBe('settled');
     expect(row?.score).toBe(20);
+  });
+
+  it('pays a snake run and marks the parade length in the ledger', async () => {
+    const run = await startRun(USER, 'snake', db);
+    await ageRun(run.runId, 120_000);
+    const result = await settleRun(USER, run.runId, 140, 119_000, db);
+
+    expect(result.payout).toBeGreaterThan(0);
+    const [row] = await db.select().from(transactions)
+      .where(and(eq(transactions.userId, USER), eq(transactions.type, 'minigame_payout')));
+    expect(row?.itemId).toBe('snake');
+    expect(row?.metadata).toMatchObject({ runId: run.runId, score: 140 });
+  });
+
+  it('refuses a snake score no meadow could have fed', async () => {
+    const run = await startRun(USER, 'snake', db);
+    await ageRun(run.runId, 10_000);
+    await expect(settleRun(USER, run.runId, 900, 10_000, db)).rejects.toThrow(MinigameError);
+
+    const [row] = await db.select().from(minigameRuns).where(eq(minigameRuns.id, run.runId));
+    expect(row?.status).toBe('rejected');
+    expect(row?.rejectReason).toBe('snake_score_exceeds_spawn_rate');
   });
 });
 

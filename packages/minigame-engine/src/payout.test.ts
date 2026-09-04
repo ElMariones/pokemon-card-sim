@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cents } from '@pcs/shared';
 import { DAILY_CAP_CENTS, clampToDailyCap, payoutFor, type MinigameId } from './index';
 
-const GAMES: MinigameId[] = ['match', 'flappy', 'type'];
+const GAMES: MinigameId[] = ['match', 'flappy', 'type', 'snake'];
 
 describe('payoutFor', () => {
   it('pays nothing for a score of zero', () => {
@@ -35,6 +35,9 @@ describe('payoutFor', () => {
     expect(payoutFor('flappy', 60)).toBeLessThan(DAILY_CAP_CENTS / 4);
     expect(payoutFor('match', 850)).toBeLessThan(DAILY_CAP_CENTS / 4);
     expect(payoutFor('type', 300)).toBeLessThan(DAILY_CAP_CENTS / 4);
+    // ~2.5 minutes of expert play, worth roughly one flappy run of the same
+    // length — the curve should never be the cheapest route to a box.
+    expect(payoutFor('snake', 150)).toBeLessThan(DAILY_CAP_CENTS / 4);
   });
 });
 

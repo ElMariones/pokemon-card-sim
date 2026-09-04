@@ -770,16 +770,26 @@ Examples:
 
 ## 16a. Minigames Arcade
 
-Three short skill games at `/games` — Flappy Pokémon, Card Match and Speed Type
-— that pay real cash into the same wallet that buys packs, plus a shop selling
-cosmetics for them.
+Four short skill games at `/games` — Flappy Pokémon, Card Match, Speed Type and
+Poké Snake — that pay real cash into the same wallet that buys packs, plus a
+shop selling cosmetics for them.
+
+Poké Snake is classic grid snake played on a moonlit meadow, with a twist that
+fits the house style: the food that grows the snake is wild Pokémon, and every
+one caught lines up behind the head as an animated follower, so the tail is a
+parade of the species the run caught. Berries are the other food — points only,
+no growth. The snack stream (berry or Pokémon, and which species) is generated
+from the run's seed like every other game's content; positions are the
+browser's to roll because only the order of what could be eaten enters
+settlement. The head of the snake is a cosmetic like the flappy bird, sold in
+the same shop; the wild roster of the meadow is not for sale.
 
 The arcade is a side income and a spending sink, never a second economy. A
 player who ignores it loses nothing but flavour.
 
 ### The cap
 
-**$150.00 per UTC day, across all three games.** This is the number that keeps
+**$150.00 per UTC day, across all four games.** This is the number that keeps
 §30 intact: if grinding Flappy were the cheapest route to a booster box, every
 other loop would become decoration.
 

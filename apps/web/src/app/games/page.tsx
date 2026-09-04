@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 import { ArcadeCabinet } from "@/components/games/ArcadeCabinet";
 import type { Cents } from "@pcs/shared";
 import type { Cosmetic, MinigameId } from "@pcs/minigame-engine";
-import { CardBack, TypeBackdrop } from "@/components/games/CosmeticArt";
+import { CardBack, SnakeParade, TypeBackdrop } from "@/components/games/CosmeticArt";
 
 interface CosmeticView extends Cosmetic {
   owned: boolean;
@@ -54,10 +54,17 @@ const MACHINES: Record<MinigameId, {
     scoring: "Pays per correct character.",
     bestLabel: "Best characters",
   },
+  snake: {
+    name: "Poké Snake",
+    href: "/games/snake",
+    tagline: "Berries for points. Pokémon for your tail.",
+    scoring: "Pays per point: a berry is one, a catch is two — and the longer your parade, the faster it runs.",
+    bestLabel: "Best score",
+  },
 };
 
 /** The order they stand on the floor. */
-const FLOOR: MinigameId[] = ["flappy", "match", "type"];
+const FLOOR: MinigameId[] = ["flappy", "match", "type", "snake"];
 
 export default function GamesPage() {
   const [view, setView] = useState<ArcadeView | null>(null);
@@ -98,7 +105,7 @@ export default function GamesPage() {
         <div>
           <h1 className="t-display mb-1 text-2xl tracking-tight">Arcade</h1>
           <p className="text-manila-2 max-w-xl text-sm">
-            Three machines in the corner of the shop. They pay real money into the same
+            Four machines in the corner of the shop. They pay real money into the same
             wallet that buys packs — capped, so the arcade stays a side income rather than
             a better one.
           </p>
@@ -141,7 +148,7 @@ export default function GamesPage() {
       {loading && <p className="text-manila-3 pane p-6 text-sm">Warming up the machines…</p>}
 
       {view && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {FLOOR.map((game) => {
             const machine = MACHINES[game];
             const stats = view.games.find((g) => g.game === game);
@@ -208,6 +215,16 @@ function CabinetScreen({ game, cosmetic }: { game: MinigameId; cosmetic?: Cosmet
             <CardBack cosmetic={cosmetic} />
           </span>
         ))}
+      </div>
+    );
+  }
+
+  if (game === "snake") {
+    // A slice of the meadow with the head the player actually leads, its two
+    // usual followers, and a berry up ahead.
+    return (
+      <div className="absolute inset-0">
+        <SnakeParade cosmetic={cosmetic} />
       </div>
     );
   }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MATCH_PAIRS, buildContent, seedRng } from './index';
+import {
+  MATCH_PAIRS, SNAKE_WILD_DEX, buildContent, seedRng, snakeFoodPoints,
+} from './index';
 
 describe('seedRng', () => {
   it('produces the same stream for the same seed', () => {
@@ -17,7 +19,7 @@ describe('buildContent — the load-bearing determinism', () => {
   // The whole verification scheme rests on the server being able to rebuild
   // exactly what the client played. If this drifts, cheating becomes free.
   it('rebuilds identical content from the same seed for every game', () => {
-    for (const game of ['match', 'flappy', 'type'] as const) {
+    for (const game of ['match', 'flappy', 'type', 'snake'] as const) {
       expect(buildContent(game, 'seed-xyz')).toEqual(buildContent(game, 'seed-xyz'));
     }
   });
@@ -70,5 +72,33 @@ describe('type content', () => {
     const content = buildContent('type', 'passage-2');
     if (content.kind !== 'type') throw new Error('wrong kind');
     expect(content.passage).not.toMatch(/ {2}/);
+  });
+});
+
+describe('snake content', () => {
+  it('builds a long food stream whose species all come from the wild roster', () => {
+    const content = buildContent('snake', 'meadow-1');
+    if (content.kind !== 'snake') throw new Error('wrong kind');
+    expect(content.foods.length).toBeGreaterThanOrEqual(300);
+    for (const food of content.foods) {
+      if (food.kind === 'pokemon') {
+        expect(SNAKE_WILD_DEX).toContain(food.dex);
+      }
+    }
+  });
+
+  it('offers both berries and wild pokémon in every stream', () => {
+    for (const seed of ['meadow-a', 'meadow-b', 'meadow-c']) {
+      const content = buildContent('snake', seed);
+      if (content.kind !== 'snake') throw new Error('wrong kind');
+      expect(content.foods.some((f) => f.kind === 'berry')).toBe(true);
+      expect(content.foods.some((f) => f.kind === 'pokemon')).toBe(true);
+    }
+  });
+
+  it('prices a wild pokémon above a berry, and the ceiling trusts it', () => {
+    expect(snakeFoodPoints({ kind: 'berry' })).toBeLessThan(
+      snakeFoodPoints({ kind: 'pokemon', dex: 10 }),
+    );
   });
 });

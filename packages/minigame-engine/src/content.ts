@@ -7,8 +7,9 @@ import type { MinigameId } from './types';
  *
  * The server hands this to the client at start and rebuilds it at settle, so a
  * claim can be checked against what was actually achievable. Only the typing
- * game currently needs the rebuild to verify a score, but all three generate
- * their content the same way so a future ceiling can rely on it.
+ * game currently needs the rebuild to verify a score exactly, but every game
+ * generates its content the same way so a future ceiling can rely on it — the
+ * snake's ceiling, for example, adds up the seeded snack stream.
  */
 
 export const MATCH_PAIRS = 12;
@@ -33,7 +34,46 @@ export interface TypeContent {
   length: number;
 }
 
-export type MinigameContent = MatchContent | FlappyContent | TypeContent;
+/** What one caught snack is worth. Berries are the steady trickle, a wild
+ * Pokémon is the jackpot — it scores double *and* joins the parade. */
+export const SNAKE_BERRY_POINTS = 1;
+export const SNAKE_POKEMON_POINTS = 2;
+
+/**
+ * The wild Pokémon that can appear on the meadow, as dex numbers naming the
+ * animated GIFs in public/sprites/pokemon. Chosen for silhouettes that still
+ * read at tail size — small, round, and brightly coloured — so a growing
+ * parade stays legible as a parade.
+ */
+export const SNAKE_WILD_DEX: readonly number[] = [
+  10, 13, 39, 52, 54, 63, 81, 92, 118, 129, 133, 152,
+  155, 158, 161, 179, 187, 194, 263, 265, 280, 300, 325, 399,
+] as const;
+
+/** The shared food stream stays long enough that a run never exhausts it. */
+export const SNAKE_CONTENT_ITEMS = 500;
+/** How often a spawn is a wild Pokémon rather than a berry. */
+const SNAKE_POKEMON_CHANCE = 0.35;
+
+export type SnakeFood = { kind: 'berry' } | { kind: 'pokemon'; dex: number };
+
+/** What a snack pays when eaten; the parade and the payout both add this up. */
+export function snakeFoodPoints(food: SnakeFood): number {
+  return food.kind === 'berry' ? SNAKE_BERRY_POINTS : SNAKE_POKEMON_POINTS;
+}
+
+export interface SnakeContent {
+  kind: 'snake';
+  /**
+   * The spawn stream: the run eats item 0 first, item 1 second, and so on.
+   * One item is on the field at a time, so the order in which the player can
+   * score is exactly this order — which is what lets the server put a ceiling
+   * on a claim. It is also the order the parade is built in.
+   */
+  foods: SnakeFood[];
+}
+
+export type MinigameContent = MatchContent | FlappyContent | TypeContent | SnakeContent;
 
 function buildMatch(rng: Rng): MatchContent {
   const cells: number[] = [];
@@ -61,11 +101,30 @@ function buildType(rng: Rng): TypeContent {
   return { kind: 'type', passage, length: passage.length };
 }
 
+function buildSnake(rng: Rng): SnakeContent {
+  // The species come from a shuffled deck that is re-dealt when it runs out,
+  // so the meadow offers a genuine mix of the roster and a long parade never
+  // shows one species twice in a row unless the deck turns over.
+  const deck = shuffle(rng, SNAKE_WILD_DEX);
+  let dealt = 0;
+  const foods: SnakeFood[] = [];
+  for (let i = 0; i < SNAKE_CONTENT_ITEMS; i++) {
+    if (rng() < SNAKE_POKEMON_CHANCE) {
+      foods.push({ kind: 'pokemon', dex: deck[dealt % deck.length]! });
+      dealt++;
+    } else {
+      foods.push({ kind: 'berry' });
+    }
+  }
+  return { kind: 'snake', foods };
+}
+
 export function buildContent(game: MinigameId, seed: string): MinigameContent {
   const rng = seedRng(seed);
   switch (game) {
     case 'match': return buildMatch(rng);
     case 'flappy': return buildFlappy(rng);
     case 'type': return buildType(rng);
+    case 'snake': return buildSnake(rng);
   }
 }

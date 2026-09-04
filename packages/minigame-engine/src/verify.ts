@@ -1,4 +1,4 @@
-import { MATCH_PAIRS, type MinigameContent } from './content';
+import { MATCH_PAIRS, snakeFoodPoints, type MinigameContent } from './content';
 import type { MinigameId } from './types';
 
 /**
@@ -28,6 +28,19 @@ export const MATCH_MAX_SCORE = 1_000;
 const TYPE_MAX_WPM = 250;
 /** The conventional definition of a "word" for typing speed. */
 const CHARS_PER_WORD = 5;
+
+/**
+ * The fastest a snack can possibly be cleared: one item spawns at a time,
+ * never sooner than the game's respawn delay, and the new one lands several
+ * cells away. 650ms per item sits well under the honest 800ms respawn plus a
+ * run-up, so real play is never refused, while still refusing a forged score.
+ */
+const SNAKE_MIN_MS_PER_EAT = 650;
+/**
+ * The first snack is already on the field when the run starts, and the
+ * content stream and the server clock can disagree by a respawn.
+ */
+const SNAKE_GRACE_ITEMS = 3;
 
 /** A slow page load or a slow network sits between the two clocks. */
 const CLOCK_SLACK_MS = 2_000;
@@ -76,6 +89,22 @@ export function verifyClaim(input: ClaimInput): ClaimVerdict {
       if (score > content.length) return reject('type_score_exceeds_passage_length');
       const maxChars = (TYPE_MAX_WPM * CHARS_PER_WORD * budget) / 60_000;
       if (score > maxChars) return reject('type_score_exceeds_human_wpm');
+      return { ok: true };
+    }
+
+    case 'snake': {
+      if (content.kind !== 'snake') return reject('content_mismatch');
+      // The run eats the stream in order and one item is on the field at a
+      // time, so the most it can possibly have scored by now is the point
+      // value of the first few items of the stream — the server rebuilds the
+      // stream from the seed and adds them up itself.
+      const eaten = Math.min(
+        content.foods.length,
+        Math.floor(budget / SNAKE_MIN_MS_PER_EAT) + SNAKE_GRACE_ITEMS,
+      );
+      let ceiling = 0;
+      for (let i = 0; i < eaten; i++) ceiling += snakeFoodPoints(content.foods[i]!);
+      if (score > ceiling) return reject('snake_score_exceeds_spawn_rate');
       return { ok: true };
     }
   }

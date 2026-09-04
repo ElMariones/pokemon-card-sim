@@ -14,7 +14,7 @@ import type { MinigameId } from './types';
  * interesting, without the tail growing fast enough to dominate the cap.
  */
 
-/** $150.00 per UTC day across all three games. Roughly one mid-tier booster box. */
+/** $150.00 per UTC day across all four games. Roughly one mid-tier booster box. */
 export const DAILY_CAP_CENTS = 15_000;
 
 export function payoutFor(game: MinigameId, score: number): Cents {
@@ -33,6 +33,12 @@ export function payoutFor(game: MinigameId, score: number): Cents {
     // Score is correct characters typed.
     case 'type':
       return cents(s * 4);
+
+    // Score is total points: +1 a berry, +2 a wild Pokémon caught. Expert
+    // play earns roughly a point a second, so 150 points (~2.5 minutes) pays
+    // about $15 — the same order as an equally long flappy run.
+    case 'snake':
+      return cents(8 * s + Math.floor((s * s) / 60));
   }
 }
 

@@ -12,9 +12,9 @@ import type { RunResult, RunStatus } from "./useMinigameRun";
  * The furniture around a game: how you start it, what it says while you play,
  * and what it pays when you stop.
  *
- * All three games need exactly this, and none of them should be re-deciding
+ * Every cabinet needs exactly this, and none of them should be re-deciding
  * how a payout is worded — a player who has learned to read one result screen
- * has learned to read all three.
+ * has learned to read them all.
  */
 
 export interface GameFrameProps {

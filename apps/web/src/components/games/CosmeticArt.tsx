@@ -2,6 +2,7 @@
 
 import { cosmeticImage, type Cosmetic } from "@pcs/minigame-engine";
 import { cn } from "@/lib/cn";
+import { useSpriteGeometry } from "./useSpriteGeometry";
 
 /**
  * How a cosmetic is drawn, wherever it is drawn.
@@ -109,12 +110,143 @@ export function CosmeticPreview({ cosmetic, owned }: { cosmetic: Drawable; owned
     );
   }
 
+  if (cosmetic.game === "snake") {
+    return (
+      <SnakeParade
+        cosmetic={cosmetic}
+        dimmed={dimmed !== ""}
+        className="snake-preview--swatch"
+      />
+    );
+  }
+
   return (
     <span className={cn("type-swatch", dimmed)} style={paletteVars(cosmetic.palette)}>
       <TypeBackdrop cosmetic={cosmetic} />
       <span className="type-swatch__line" aria-hidden="true">
         <span className="type-swatch__typed">evolving sk</span>ies booster box
       </span>
+    </span>
+  );
+}
+
+/**
+ * An Oran berry: the snake's point snack, drawn small enough to sit on a
+ * 30px meadow cell and sharp enough to read there. Pure SVG so the fruit
+ * needs no downloaded asset of its own — the only GIFs in the meadow are
+ * Pokémon, which is the point.
+ */
+export function BerryGlyph({ px = 22 }: { px?: number }) {
+  return (
+    <svg
+      viewBox="0 0 26 26"
+      width={px}
+      height={px}
+      aria-hidden="true"
+      style={{ overflow: "visible" }}
+    >
+      <rect x="12" y="1.6" width="2" height="5.4" rx="1" fill="#8a5a2e" />
+      <path
+        d="M13.2 6.8C11.4 3.6 7.4 2.8 4.4 4.6c1.3 2.8 4.6 4.3 8.8 3.4z"
+        fill="#58a860"
+      />
+      <path
+        d="M12.8 6.8C14.6 3.6 18.6 2.8 21.6 4.6c-1.3 2.8-4.6 4.3-8.8 3.4z"
+        fill="#58a860"
+      />
+      <circle cx="13" cy="15.6" r="9.4" fill="#3f92e0" stroke="#1e4d7c" strokeWidth="1.1" />
+      <path
+        d="M13 6.6a9.4 9.4 0 0 0 0 18.8z"
+        fill="#2b6cb8"
+        opacity="0.7"
+      />
+      <ellipse
+        cx="9.7"
+        cy="11.7"
+        rx="2.7"
+        ry="1.6"
+        transform="rotate(-24 9.7 11.7)"
+        fill="#ffffff"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+/** One sprite centred on the point its body occupies, at preview sizes. */
+function ParadeSprite({
+  src,
+  body,
+  left,
+  top = "50%",
+  flip = true,
+  bob = 0,
+}: {
+  src: string;
+  body: number;
+  left: string;
+  top?: string;
+  /** Parade previews face the way a parade travels: right, so mirrored. */
+  flip?: boolean;
+  /** Staggered idle bob, in seconds of animation-delay. */
+  bob?: number;
+}) {
+  const { w, h, cx, cy } = useSpriteGeometry(src, body);
+  return (
+    <span
+      className="snake-parade__bob absolute"
+      style={{ left, top, animationDelay: bob ? `-${bob}s` : undefined }}
+      aria-hidden="true"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        className={cn("pixel block", flip && "-scale-x-100")}
+        style={{
+          width: w,
+          height: h,
+          transform: `translate(${-cx * 100}%, ${-cy * 100}%)`,
+        }}
+      />
+    </span>
+  );
+}
+
+/**
+ * The snake's cabinet and shop preview: a slice of the meadow with the
+ * equipped head leading two fixed parade members towards a berry.
+ *
+ * The head is the cosmetic; the followers and the berry are the game, which
+ * is why they are hard-coded here rather than sold. Everything is measured
+ * and drawn at body scale, like the real playfield, so the preview is the
+ * game rather than an illustration of it.
+ */
+export function SnakeParade({
+  cosmetic,
+  dimmed,
+  className,
+}: {
+  cosmetic?: Drawable;
+  dimmed?: boolean;
+  className?: string;
+}) {
+  const sprite = cosmetic?.sprite ?? 23;
+  const headSrc = `/sprites/pokemon/${sprite}.gif`;
+  return (
+    <span
+      className={cn("snake-parade", dimmed && "cosmetic-locked", className)}
+      style={paletteVars(cosmetic?.palette)}
+    >
+      <span className="snake-parade__moon" aria-hidden="true" />
+      <span className="snake-parade__grid" aria-hidden="true" />
+      <span className="snake-parade__berry" aria-hidden="true">
+        <BerryGlyph px={20} />
+      </span>
+      <ParadeSprite src="/sprites/pokemon/129.gif" body={22} left="26%" bob={1.2} />
+      <ParadeSprite src="/sprites/pokemon/133.gif" body={26} left="44%" bob={0.6} />
+      <ParadeSprite src={headSrc} body={34} left="62%" bob={0.2} />
     </span>
   );
 }

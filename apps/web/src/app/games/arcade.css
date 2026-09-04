@@ -572,6 +572,234 @@
   box-shadow: inset 2px 0 0 var(--cab);
 }
 
+/* ---------------------------------------------------------------------------
+   Poké Snake: the meadow.
+
+   A moonlit field at the edge of the shop's grounds. Dark enough that the
+   animated sprites pop, green enough that it reads as outdoors — and unlike
+   the Route, nothing here scrolls, because the player is the thing that
+   moves. The grid is the game: the board is 24x16 cells of 30px, and the
+   lines are drawn at exactly 30px inside the playfield's own coordinate
+   space, so they agree with the logic the cells are played on.
+   --------------------------------------------------------------------------- */
+
+/* The playfield's own frame shows the grass colour until the scaled board
+   settles on it, and behind the rounded corners after. */
+.playfield--meadow {
+  background: #1d3a2a;
+}
+
+/* Shared meadow paint, used at playfield size and (overridden below) on the
+   cabinet screen and the shop swatch. */
+.snake-parade,
+.snake-board {
+  background-image:
+    /* a moonlit sheen high in the sky */
+    radial-gradient(120% 92% at 50% 12%, rgba(206, 232, 214, 0.08), transparent 58%),
+    /* the grass, deeper towards the bottom of the field */
+    linear-gradient(180deg, #162b20 0%, #1d3a2a 55%, #214430 100%);
+}
+
+.snake-board {
+  background-image:
+    /* the sheen and the grass... */
+    radial-gradient(120% 92% at 50% 12%, rgba(206, 232, 214, 0.08), transparent 58%),
+    linear-gradient(180deg, #162b20 0%, #1d3a2a 55%, #214430 100%),
+    /* ...then the 30px cell grid on top */
+    linear-gradient(rgba(156, 208, 168, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(156, 208, 168, 0.05) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    30px 30px,
+    30px 30px;
+}
+
+.snake-moon {
+  position: absolute;
+  top: 5%;
+  right: 9%;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 38% 34%, #fffdf2 0%, #efe9d2 42%, #d8d2b8 78%, #c4bea4 100%);
+  box-shadow:
+    0 0 26px 8px rgba(226, 233, 205, 0.22),
+    inset -6px -4px 10px rgba(120, 116, 96, 0.22);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+/* Fireflies: two wandering specks of light, so the dark meadow is alive
+   without anything else competing with the parade. */
+.snake-fly {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(222, 240, 158, 0.9);
+  box-shadow: 0 0 9px 2px rgba(222, 240, 158, 0.4);
+  pointer-events: none;
+  animation: snake-drift 9s ease-in-out infinite alternate;
+}
+
+.snake-fly--a { top: 27%; left: 14%; }
+.snake-fly--b { top: 66%; left: 74%; animation-duration: 13s; animation-delay: -6s; }
+
+@keyframes snake-drift {
+  from { transform: translate(0, 0); opacity: 0.15; }
+  30% { opacity: 0.95; }
+  to { transform: translate(30px, -26px); opacity: 0.1; }
+}
+
+/* Low ground cover along the bottom of the field, drawn as soft mounds so
+   the fence line is not a hard black edge. */
+.snake-tufts {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(36px 13px at 9% 98%, rgba(52, 100, 66, 0.85) 55%, transparent 56%),
+    radial-gradient(52px 17px at 31% 99%, rgba(44, 86, 56, 0.9) 55%, transparent 56%),
+    radial-gradient(44px 15px at 66% 98%, rgba(50, 96, 64, 0.85) 55%, transparent 56%),
+    radial-gradient(58px 19px at 91% 97%, rgba(42, 82, 54, 0.9) 55%, transparent 56%);
+  pointer-events: none;
+}
+
+/* --- Snake's actors ------------------------------------------------------- */
+
+.snake-seg {
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* The head leads the paint order too, so a follower can never overlap it. */
+.snake-head {
+  z-index: 3;
+}
+
+.snake-head img {
+  filter: drop-shadow(0 3px 3px rgba(6, 12, 9, 0.55));
+}
+
+.snake-food__bob {
+  --amp: 0.8;
+  animation: sprite-bob 1.9s var(--ease-vitrine) infinite;
+}
+
+.snake-food__berry {
+  display: block;
+  margin: 3px;
+}
+
+/* Floating point award above the cell that was just eaten. */
+.snake-pop {
+  position: absolute;
+  z-index: 5;
+  font-family: var(--font-num, inherit);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: snake-pop 850ms ease-out forwards;
+}
+
+.snake-pop--berry { color: var(--color-manila-2); }
+.snake-pop--pokemon { color: var(--color-brass); }
+
+@keyframes snake-pop {
+  0% { opacity: 0; transform: translate(-50%, -60%) scale(0.7); }
+  14% { opacity: 1; transform: translate(-50%, -110%) scale(1.08); }
+  100% { opacity: 0; transform: translate(-50%, -230%) scale(1); }
+}
+
+/* The catch toast: who just joined the parade. */
+.snake-toast {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 224, 200, 0.16);
+  background: rgba(10, 20, 14, 0.8);
+  color: var(--color-manila);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(3px);
+  animation: snake-toast-in 200ms ease-out;
+}
+
+@keyframes snake-toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* --- The meadow on the cabinet and in the shop -----------------------------
+
+   Both previews are the same scene — the equipped head leading two of the
+   usual meadow members towards a berry — drawn at body scale exactly like the
+   live field, so the preview is the game rather than an illustration of it. */
+.snake-parade {
+  --amp: 0.55;
+  display: block;
+  overflow: hidden;
+  border-radius: 4px;
+  isolation: isolate;
+}
+
+/* The shop swatch is the same 16:10 shape as every other preview. */
+.snake-preview--swatch {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+}
+
+/* On a cabinet screen the meadow fills the whole tube. */
+.cabinet__screen .snake-parade {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.snake-parade__moon {
+  position: absolute;
+  top: 9%;
+  right: 8%;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 38% 34%, #fffdf2 0%, #efe9d2 42%, #d8d2b8 78%, #c4bea4 100%);
+  box-shadow: 0 0 12px 4px rgba(226, 233, 205, 0.2);
+  opacity: 0.9;
+}
+
+/* A faint 30px grid, echoing the real board. */
+.snake-parade__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(156, 208, 168, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(156, 208, 168, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.snake-parade__berry {
+  position: absolute;
+  right: 9%;
+  bottom: 22%;
+}
+
+.snake-parade__bob {
+  --amp: 0.5;
+  animation: sprite-bob 2.4s var(--ease-vitrine) infinite;
+}
+
 /* --- Shop ----------------------------------------------------------------- */
 
 .cosmetic {
@@ -622,7 +850,11 @@
 /* --- Motion --------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .sprite-bob { animation: none; }
+  .sprite-bob,
+  .snake-food__bob,
+  .snake-parade__bob,
+  .snake-fly { animation: none; }
+  .snake-pop, .snake-toast { animation-duration: 1ms; }
   .cabinet, .cosmetic { transition: none; }
   .cabinet:hover, .cosmetic:hover { transform: none; }
   .match-cell__inner { transition-duration: 1ms; }

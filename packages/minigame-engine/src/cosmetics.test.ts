@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARTWORK_DEX, COSMETICS, FLAPPY_SPRITES, MINIGAME_IDS, cosmeticById, cosmeticImage,
+  ARTWORK_DEX, COSMETICS, MINIGAME_IDS, SPRITE_DEX, cosmeticById, cosmeticImage,
   cosmeticsForGame, defaultCosmeticFor,
 } from './index';
 
@@ -34,6 +34,7 @@ describe('the cosmetics catalogue', () => {
 
   it('resolves a cosmetic by id and refuses an unknown one', () => {
     expect(cosmeticById('flappy-pidgey')?.game).toBe('flappy');
+    expect(cosmeticById('snake-ekans')?.game).toBe('snake');
     expect(cosmeticById('nope')).toBeUndefined();
   });
 
@@ -44,16 +45,17 @@ describe('the cosmetics catalogue', () => {
   });
 
   it('asks each importer for exactly the ids the catalogue draws', () => {
-    expect([...FLAPPY_SPRITES].sort()).toEqual(
-      [...new Set(cosmeticsForGame('flappy').map((c) => c.sprite!))].sort(),
-    );
+    const sprites = COSMETICS.flatMap((c) => (c.sprite ? [c.sprite] : []));
+    expect([...SPRITE_DEX].sort()).toEqual([...new Set(sprites)].sort());
     const drawn = COSMETICS.flatMap((c) => (c.artwork ? [c.artwork] : []));
     expect([...ARTWORK_DEX].sort()).toEqual([...new Set(drawn)].sort());
   });
 
-  it('gives every flappy cosmetic a sprite to render', () => {
-    for (const c of cosmeticsForGame('flappy')) {
-      expect(c.sprite).toBeTruthy();
+  it('gives every flappy and snake cosmetic an animated sprite to render', () => {
+    for (const game of ['flappy', 'snake'] as const) {
+      for (const c of cosmeticsForGame(game)) {
+        expect(c.sprite, c.id).toBeTruthy();
+      }
     }
   });
 

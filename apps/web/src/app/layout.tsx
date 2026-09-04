@@ -1,24 +1,53 @@
 import type { Metadata } from "next";
-import { Archivo, Instrument_Sans, DM_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { AppHeader } from "@/components/AppHeader";
 import { PageTransition } from "@/components/PageTransition";
 
-const archivo = Archivo({
+// The same three families Google Fonts serves (Archivo with its width axis,
+// Instrument Sans, DM Mono), self-hosted from @fontsource so a build or a dev
+// server never needs to reach fonts.googleapis.com — the sandboxed dev
+// environment has no route to it, and a build that depends on a third host is
+// a build that can fail for reasons that have nothing to do with the code.
+const archivo = localFont({
+  src: [
+    {
+      path: "../../../../node_modules/@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
   variable: "--font-archivo",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  display: "swap",
 });
-const instrument = Instrument_Sans({
+const instrument = localFont({
+  src: [
+    {
+      path: "../../../../node_modules/@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2",
+      weight: "400 700",
+      style: "normal",
+    },
+  ],
   variable: "--font-instrument",
-  subsets: ["latin"],
+  display: "swap",
 });
-const dmMono = DM_Mono({
+const dmMono = localFont({
+  src: [
+    {
+      path: "../../../../node_modules/@fontsource/dm-mono/files/dm-mono-latin-400-normal.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../../../node_modules/@fontsource/dm-mono/files/dm-mono-latin-500-normal.woff2",
+      weight: "500",
+      style: "normal",
+    },
+  ],
   variable: "--font-dm-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

@@ -73,3 +73,48 @@ describe('verifyClaim — type', () => {
     expect(verifyClaim(claim('type', 250, 2_000)).ok).toBe(false);
   });
 });
+
+describe('verifyClaim — snake', () => {
+  it('accepts a long, fast, excellent run', () => {
+    // Roughly a point a second for three minutes is expert play, and must
+    // not be refused: the ceiling exists to refuse the impossible, not to
+    // police the merely excellent.
+    expect(verifyClaim(claim('snake', 170, 180_000)).ok).toBe(true);
+  });
+
+  it('accepts the exact contents of the seeded stream at a plausible pace', () => {
+    const c = claim('snake', 0, 10_000);
+    if (c.content.kind !== 'snake') throw new Error('wrong kind');
+    const score = c.content.foods.slice(0, 10).reduce(
+      (sum, food) => sum + (food.kind === 'berry' ? 1 : 2), 0,
+    );
+    expect(verifyClaim({ ...c, score }).ok).toBe(true);
+  });
+
+  it('rejects more points than the stream could have fed by then', () => {
+    // 150 points in ten seconds would need a snack every 65ms — above even
+    // the most pokémon-heavy stream the seed could have produced.
+    expect(verifyClaim(claim('snake', 150, 10_000)).ok).toBe(false);
+
+    // One point over what the actual seeded stream supports at 60s is refused
+    // too, however the seed fell.
+    const c = claim('snake', 0, 60_000);
+    if (c.content.kind !== 'snake') throw new Error('wrong kind');
+    const eaten = Math.floor(60_000 / 650) + 3;
+    const points = (items: typeof c.content.foods) =>
+      items.reduce((sum, f) => sum + (f.kind === 'berry' ? 1 : 2), 0);
+    expect(verifyClaim({ ...c, score: points(c.content.foods.slice(0, eaten)) + 1 }).ok)
+      .toBe(false);
+    // The same window at the stream's own worst-case value is accepted.
+    expect(verifyClaim({ ...c, score: eaten }).ok).toBe(true);
+  });
+
+  it('rejects a claim above even the whole stream', () => {
+    expect(verifyClaim(claim('snake', 10_000, 3_600_000)).ok).toBe(false);
+  });
+
+  it('rejects a snake score on another game’s content', () => {
+    const c = claim('snake', 5, 10_000);
+    expect(verifyClaim({ ...c, content: buildContent('flappy', 's') }).ok).toBe(false);
+  });
+});
