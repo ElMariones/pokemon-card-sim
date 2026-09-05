@@ -221,11 +221,13 @@ function CabinetScreen({ game, cosmetic }: { game: MinigameId; cosmetic?: Cosmet
 
   if (game === "snake") {
     return (
-      <div className="absolute inset-0 bg-[#368e4a] [background-image:linear-gradient(45deg,#28783b_25%,transparent_25%,transparent_75%,#28783b_75%),linear-gradient(45deg,#28783b_25%,transparent_25%,transparent_75%,#28783b_75%)] [background-position:0_0,10px_10px] [background-size:20px_20px]">
-        <span className="absolute left-[18%] top-[28%] h-7 w-7 rounded-full bg-[#f1cf3c] ring-2 ring-[#4d3a11]" />
-        <span className="absolute left-[39%] top-[47%] h-5 w-5 rounded-full bg-[#ef8a3e] ring-2 ring-[#5c2d13]" />
-        <span className="absolute left-[58%] top-[54%] h-4 w-4 rounded-full bg-[#75bce8] ring-2 ring-[#17466c]" />
-        <span className="absolute right-[14%] top-[20%] text-lg">🍓</span>
+      <div className="snake-cabinet-screen">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" alt="" className="snake-cabinet-screen__lead" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="https://play.pokemonshowdown.com/sprites/ani/charmander.gif" alt="" className="snake-cabinet-screen__tail" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="https://play.pokemonshowdown.com/sprites/itemicons/oran-berry.png" alt="" className="snake-cabinet-screen__berry" />
       </div>
     );
   }

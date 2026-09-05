@@ -21,10 +21,10 @@ const FLAPPY_MIN_MS_PER_GAP = 700;
 const FLAPPY_GRACE = 2;
 
 /** PokéSnake cannot advance faster than its 75ms speed floor. A berry is at
- * most 40 points and cannot share a cell with a wild Pokémon, so 40 points per
+ * most 50 points and cannot share a cell with a wild Pokémon, so 50 points per
  * tick is a deliberately generous maximum. */
 const SNAKE_MIN_MS_PER_TICK = 75;
-const SNAKE_MAX_POINTS_PER_TICK = 40;
+const SNAKE_MAX_POINTS_PER_TICK = 50;
 
 /** No one resolves a pair — two flips and a look — faster than this. */
 const MATCH_MIN_MS_PER_TURN = 350;

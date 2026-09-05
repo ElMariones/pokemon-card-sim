@@ -6,7 +6,11 @@ export const BASE_TICK_MS = 170;
 export const MIN_TICK_MS = 75;
 export const SPEEDUP_PER_SEGMENT_MS = 4;
 export const WILD_POINTS = 10;
+export const SHINY_WILD_POINTS = 50;
 export const BERRY_SPAWN_CHANCE = 0.06;
+/** Roughly one roll every 34 seconds at the opening speed. */
+export const STAR_SPAWN_CHANCE = 0.005;
+export const STAR_TTL = 34;
 export const MAX_QUEUED_INPUTS = 2;
 
 export const DIR_VECTORS: Record<Direction, Point> = {

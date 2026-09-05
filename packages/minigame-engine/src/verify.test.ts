@@ -47,7 +47,7 @@ describe('verifyClaim — snake', () => {
   });
 
   it('rejects more points than the fastest possible ticks allow', () => {
-    expect(verifyClaim(claim('snake', 6_000, 10_000)).ok).toBe(false);
+    expect(verifyClaim(claim('snake', 6_800, 10_000)).ok).toBe(false);
   });
 });
 

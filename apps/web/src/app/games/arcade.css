@@ -559,6 +559,278 @@
 .type-char--pending { color: var(--color-manila-3); }
 .type-char--correct { color: var(--cab); }
 
+/* --- PokéSnake ----------------------------------------------------------- */
+
+.snake-cabinet-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: #4f9b58;
+  background-image:
+    linear-gradient(to right, rgba(236, 255, 213, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(236, 255, 213, 0.2) 1px, transparent 1px);
+  background-size: 10% 100%, 100% 12.5%;
+}
+.snake-cabinet-screen img { position: absolute; object-fit: contain; image-rendering: pixelated; }
+.snake-cabinet-screen__lead { left: 27%; top: 29%; width: 25%; height: 36%; }
+.snake-cabinet-screen__tail { left: 15%; top: 40%; width: 21%; height: 31%; }
+.snake-cabinet-screen__berry { right: 18%; top: 24%; width: 10%; }
+
+.snake-console {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--cab) 34%, var(--color-seam));
+  border-radius: calc(var(--radius-pane) + 3px);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--cab-deep) 22%, var(--color-vitrine-2)), var(--color-ink));
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 color-mix(in oklab, var(--cab) 20%, transparent);
+}
+
+.snake-hud {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--cab) 24%, var(--color-seam));
+  background: color-mix(in oklab, var(--color-ink) 70%, var(--cab-deep));
+}
+
+.snake-scoreboard { display: flex; gap: clamp(1rem, 5vw, 2.75rem); }
+.snake-scoreboard div { min-width: 2.8rem; }
+.snake-scoreboard dt,
+.snake-underboard__label {
+  color: var(--color-manila-3);
+  font-size: 0.62rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.snake-scoreboard dd {
+  margin-top: 0.28rem;
+  color: var(--color-manila);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.snake-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-seam);
+  border-radius: 999px;
+  padding: 0.32rem 0.55rem;
+  color: var(--color-manila-3);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+.snake-status--shiny {
+  border-color: rgba(255, 225, 113, 0.48);
+  color: #ffe171;
+  background: rgba(255, 210, 62, 0.08);
+}
+
+.snake-field {
+  --snake-grass: #4c9a57;
+  --snake-shadow: #225c35;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  background: var(--snake-grass);
+  box-shadow:
+    inset 0 0 0 2px rgba(10, 39, 22, 0.72),
+    inset 0 0 40px rgba(9, 33, 18, 0.28);
+}
+
+/* Quiet route texture underneath the grid: enough terrain to feel authored,
+   never enough to compete with a sprite occupying one small cell. */
+.snake-field__texture {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(236, 255, 189, 0.18) 0 2px, transparent 3px),
+    radial-gradient(circle at 76% 72%, rgba(20, 69, 34, 0.19) 0 2px, transparent 3px),
+    linear-gradient(135deg, transparent 47%, rgba(239, 255, 213, 0.055) 48% 52%, transparent 53%);
+  background-size: 47px 41px, 59px 53px, 18px 18px;
+  pointer-events: none;
+}
+
+/* Exact 20 × 16 lines. Percentage tiles keep every cell aligned with the
+   engine at every responsive width, including narrow phones. */
+.snake-field__grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image:
+    linear-gradient(to right, rgba(236, 255, 213, 0.23) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(236, 255, 213, 0.23) 1px, transparent 1px);
+  background-size: 5% 100%, 100% 6.25%;
+  border: 1px solid rgba(236, 255, 213, 0.28);
+  pointer-events: none;
+}
+
+.snake-pickup,
+.snake-wild,
+.snake-segment {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.snake-pickup { align-items: center; }
+.snake-item-icon {
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px rgba(15, 35, 18, 0.62));
+}
+.snake-pickup--star {
+  z-index: 5;
+  animation: snake-star-pulse 820ms ease-in-out infinite alternate;
+}
+.snake-wild { z-index: 4; animation: snake-wild-arrive 210ms ease-out; }
+.snake-wild--shiny::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 237, 136, 0.52), rgba(255, 224, 84, 0.06) 54%, transparent 70%);
+  animation: snake-shiny-glow 950ms ease-in-out infinite alternate;
+}
+.snake-wild__sparkle {
+  position: absolute;
+  right: -18%;
+  top: -30%;
+  z-index: 2;
+  color: #fff0a0;
+  filter: drop-shadow(0 0 4px #ffd43b);
+}
+
+.snake-toast {
+  position: absolute;
+  left: 50%;
+  top: 0.6rem;
+  z-index: 30;
+  max-width: calc(100% - 2rem);
+  transform: translateX(-50%);
+  border: 1px solid rgba(240, 255, 223, 0.2);
+  border-radius: 999px;
+  background: rgba(12, 31, 18, 0.83);
+  padding: 0.38rem 0.72rem;
+  color: #f5ffe9;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: snake-toast-in 180ms ease-out;
+}
+.snake-toast--shiny { border-color: rgba(255, 229, 112, 0.65); color: #ffe570; }
+
+.snake-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  gap: 0.35rem;
+  background: rgba(7, 18, 12, 0.68);
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 650;
+  text-align: center;
+  backdrop-filter: blur(2px);
+}
+.snake-pause span { color: rgba(255, 255, 255, 0.7); font-size: 0.7rem; font-weight: 400; }
+
+.snake-underboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+.snake-party { min-width: 0; }
+.snake-party > div { margin-top: 0.35rem; }
+.snake-legend {
+  display: flex;
+  max-width: 19rem;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: flex-end;
+  gap: 0.25rem 0.55rem;
+  color: var(--color-manila-3);
+  font-family: var(--font-mono);
+  font-size: 0.59rem;
+}
+.snake-legend span { display: inline-flex; align-items: center; gap: 0.12rem; white-space: nowrap; }
+.snake-legend img { width: 18px; height: 18px; object-fit: contain; image-rendering: pixelated; }
+.snake-legend__star { color: #ffe171; }
+
+.snake-dpad {
+  display: none;
+  width: fit-content;
+  grid-template-columns: repeat(3, 3rem);
+  gap: 0.3rem;
+  margin: 0.85rem auto 0;
+}
+.snake-dpad__key {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border: 1px solid var(--color-seam);
+  border-radius: var(--radius-pane);
+  background: var(--color-vitrine-2);
+  color: var(--color-manila);
+  font-size: 1.1rem;
+  touch-action: manipulation;
+}
+.snake-dpad__key:active { background: color-mix(in oklab, var(--cab) 18%, var(--color-vitrine-3)); }
+.snake-dpad__key:focus-visible { outline: 2px solid var(--cab); outline-offset: 2px; }
+
+@keyframes snake-wild-arrive {
+  from { opacity: 0; transform: scale(0.55); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes snake-star-pulse {
+  from { transform: scale(0.9) rotate(-5deg); filter: brightness(1); }
+  to { transform: scale(1.14) rotate(5deg); filter: brightness(1.35); }
+}
+@keyframes snake-shiny-glow {
+  from { opacity: 0.45; transform: scale(0.9); }
+  to { opacity: 0.9; transform: scale(1.08); }
+}
+@keyframes snake-toast-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 639px) {
+  .snake-hud { align-items: flex-start; }
+  .snake-scoreboard { gap: 0.8rem; }
+  .snake-status { display: none; }
+  .snake-underboard { grid-template-columns: 1fr; }
+  .snake-legend { max-width: none; justify-content: flex-start; }
+  .snake-dpad { display: grid; }
+  .snake-toast { max-width: 88%; font-size: 0.62rem; white-space: normal; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snake-pickup--star,
+  .snake-wild,
+  .snake-wild--shiny::before,
+  .snake-toast { animation: none; }
+}
+
 .type-char--wrong {
   color: var(--color-loss);
   background: color-mix(in oklab, var(--color-loss) 20%, transparent);
