@@ -41,6 +41,16 @@ describe('verifyClaim — flappy', () => {
   });
 });
 
+describe('verifyClaim — snake', () => {
+  it('accepts an excellent but possible berry-heavy run', () => {
+    expect(verifyClaim(claim('snake', 4_000, 10_000)).ok).toBe(true);
+  });
+
+  it('rejects more points than the fastest possible ticks allow', () => {
+    expect(verifyClaim(claim('snake', 6_000, 10_000)).ok).toBe(false);
+  });
+});
+
 describe('verifyClaim — match', () => {
   it('accepts a fast, clean board', () => {
     expect(verifyClaim(claim('match', 850, 40_000)).ok).toBe(true);

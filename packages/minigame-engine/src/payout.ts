@@ -26,6 +26,11 @@ export function payoutFor(game: MinigameId, score: number): Cents {
     case 'flappy':
       return cents(15 * s + Math.floor((s * s) / 20));
 
+    // Score is points collected: ten per recruited Pokémon, five to forty per
+    // berry. A good party pays about the same as a solid Flappy run.
+    case 'snake':
+      return cents(2 * s + Math.floor((s * s) / 500));
+
     // Score is the board result, 0..1000, already weighted for moves and time.
     case 'match':
       return cents(Math.floor(s * 1.5));

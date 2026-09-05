@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cents } from '@pcs/shared';
 import { DAILY_CAP_CENTS, clampToDailyCap, payoutFor, type MinigameId } from './index';
 
-const GAMES: MinigameId[] = ['match', 'flappy', 'type'];
+const GAMES: MinigameId[] = ['match', 'flappy', 'snake', 'type'];
 
 describe('payoutFor', () => {
   it('pays nothing for a score of zero', () => {

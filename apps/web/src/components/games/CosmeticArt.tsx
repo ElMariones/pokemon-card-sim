@@ -109,6 +109,14 @@ export function CosmeticPreview({ cosmetic, owned }: { cosmetic: Drawable; owned
     );
   }
 
+  if (cosmetic.game === "snake") {
+    return (
+      <span className={cn("grid h-24 w-full place-items-center rounded-[4px] bg-[#368e4a] text-3xl", dimmed)}>
+        ⚡
+      </span>
+    );
+  }
+
   return (
     <span className={cn("type-swatch", dimmed)} style={paletteVars(cosmetic.palette)}>
       <TypeBackdrop cosmetic={cosmetic} />

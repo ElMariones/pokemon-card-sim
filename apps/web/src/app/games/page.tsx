@@ -40,6 +40,13 @@ const MACHINES: Record<MinigameId, {
     scoring: "Pays per box cleared, and more the further you get.",
     bestLabel: "Best run",
   },
+  snake: {
+    name: "PokéSnake",
+    href: "/games/snake",
+    tagline: "Recruit wild Pokémon. Do not bite your party.",
+    scoring: "Wild Pokémon grow your party. Berries are worth extra points.",
+    bestLabel: "Best party",
+  },
   match: {
     name: "Card Match",
     href: "/games/match",
@@ -57,7 +64,7 @@ const MACHINES: Record<MinigameId, {
 };
 
 /** The order they stand on the floor. */
-const FLOOR: MinigameId[] = ["flappy", "match", "type"];
+const FLOOR: MinigameId[] = ["flappy", "snake", "match", "type"];
 
 export default function GamesPage() {
   const [view, setView] = useState<ArcadeView | null>(null);
@@ -208,6 +215,17 @@ function CabinetScreen({ game, cosmetic }: { game: MinigameId; cosmetic?: Cosmet
             <CardBack cosmetic={cosmetic} />
           </span>
         ))}
+      </div>
+    );
+  }
+
+  if (game === "snake") {
+    return (
+      <div className="absolute inset-0 bg-[#368e4a] [background-image:linear-gradient(45deg,#28783b_25%,transparent_25%,transparent_75%,#28783b_75%),linear-gradient(45deg,#28783b_25%,transparent_25%,transparent_75%,#28783b_75%)] [background-position:0_0,10px_10px] [background-size:20px_20px]">
+        <span className="absolute left-[18%] top-[28%] h-7 w-7 rounded-full bg-[#f1cf3c] ring-2 ring-[#4d3a11]" />
+        <span className="absolute left-[39%] top-[47%] h-5 w-5 rounded-full bg-[#ef8a3e] ring-2 ring-[#5c2d13]" />
+        <span className="absolute left-[58%] top-[54%] h-4 w-4 rounded-full bg-[#75bce8] ring-2 ring-[#17466c]" />
+        <span className="absolute right-[14%] top-[20%] text-lg">🍓</span>
       </div>
     );
   }

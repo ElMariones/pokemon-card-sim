@@ -45,6 +45,20 @@ export interface Cosmetic {
 }
 
 export const COSMETICS: readonly Cosmetic[] = [
+  // --- PokéSnake: the field ---------------------------------------------
+  // Pikachu is always the head and recruited Pokémon make up the rest of the
+  // party, so this is intentionally only a field theme, never an advantage.
+  {
+    id: 'snake-tall-grass', game: 'snake', name: 'Tall grass',
+    blurb: 'Pikachu leads. Everyone else joins the line.',
+    price: cents(0), artwork: 25, palette: ['#69b66b', '#225c35'],
+  },
+  {
+    id: 'snake-lavender-path', game: 'snake', name: 'Lavender path',
+    blurb: 'The same rules, after sundown.',
+    price: cents(7_500), artwork: 94, palette: ['#9d82c7', '#413060'],
+  },
+
   // --- Flappy: who you fly as -------------------------------------------
   {
     id: 'flappy-pidgey', game: 'flappy', name: 'Pidgey',

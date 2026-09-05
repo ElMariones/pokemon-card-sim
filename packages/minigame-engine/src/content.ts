@@ -33,7 +33,12 @@ export interface TypeContent {
   length: number;
 }
 
-export type MinigameContent = MatchContent | FlappyContent | TypeContent;
+/** Snake's complete board is generated locally from the signed run seed. */
+export interface SnakeContent {
+  kind: 'snake';
+}
+
+export type MinigameContent = MatchContent | FlappyContent | SnakeContent | TypeContent;
 
 function buildMatch(rng: Rng): MatchContent {
   const cells: number[] = [];
@@ -66,6 +71,7 @@ export function buildContent(game: MinigameId, seed: string): MinigameContent {
   switch (game) {
     case 'match': return buildMatch(rng);
     case 'flappy': return buildFlappy(rng);
+    case 'snake': return { kind: 'snake' };
     case 'type': return buildType(rng);
   }
 }

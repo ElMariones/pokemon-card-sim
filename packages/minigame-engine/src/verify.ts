@@ -20,6 +20,12 @@ const FLAPPY_MIN_MS_PER_GAP = 700;
 /** Two extra, for the obstacles already on screen when a run begins. */
 const FLAPPY_GRACE = 2;
 
+/** PokéSnake cannot advance faster than its 75ms speed floor. A berry is at
+ * most 40 points and cannot share a cell with a wild Pokémon, so 40 points per
+ * tick is a deliberately generous maximum. */
+const SNAKE_MIN_MS_PER_TICK = 75;
+const SNAKE_MAX_POINTS_PER_TICK = 40;
+
 /** No one resolves a pair — two flips and a look — faster than this. */
 const MATCH_MIN_MS_PER_TURN = 350;
 export const MATCH_MAX_SCORE = 1_000;
@@ -60,6 +66,13 @@ export function verifyClaim(input: ClaimInput): ClaimVerdict {
     case 'flappy': {
       const ceiling = Math.floor(budget / FLAPPY_MIN_MS_PER_GAP) + FLAPPY_GRACE;
       if (score > ceiling) return reject('flappy_score_exceeds_spawn_rate');
+      return { ok: true };
+    }
+
+    case 'snake': {
+      if (content.kind !== 'snake') return reject('content_mismatch');
+      const ceiling = Math.ceil(budget / SNAKE_MIN_MS_PER_TICK) * SNAKE_MAX_POINTS_PER_TICK;
+      if (score > ceiling) return reject('snake_score_exceeds_tick_rate');
       return { ok: true };
     }
 

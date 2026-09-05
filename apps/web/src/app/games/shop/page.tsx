@@ -21,6 +21,7 @@ interface ArcadeView {
 
 const SECTIONS: { game: MinigameId; title: string; note: string }[] = [
   { game: "flappy", title: "Who you fly as", note: "Flappy Pokémon. Purely who you are — none of them fly better." },
+  { game: "snake", title: "Where you slither", note: "PokéSnake. Pikachu always leads; the field is just a field." },
   { game: "match", title: "The back of the card", note: "Card Match. Twelve of these, face down — the genuine blue back until you buy your way off it." },
   { game: "type", title: "What you type over", note: "Speed Type. The art behind the passage, kept dim enough to read through." },
 ];

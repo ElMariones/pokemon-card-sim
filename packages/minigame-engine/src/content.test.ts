@@ -17,7 +17,7 @@ describe('buildContent — the load-bearing determinism', () => {
   // The whole verification scheme rests on the server being able to rebuild
   // exactly what the client played. If this drifts, cheating becomes free.
   it('rebuilds identical content from the same seed for every game', () => {
-    for (const game of ['match', 'flappy', 'type'] as const) {
+    for (const game of ['match', 'flappy', 'snake', 'type'] as const) {
       expect(buildContent(game, 'seed-xyz')).toEqual(buildContent(game, 'seed-xyz'));
     }
   });
