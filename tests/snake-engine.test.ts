@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BERRIES, MIN_TICK_MS, WILD_POINTS } from "./constants";
-import { createInitialState, facingOf, queueDirection, start, step, tickMsFor } from "./engine";
-import type { SnakeState } from "./types";
+import { BERRIES, MIN_TICK_MS, WILD_POINTS } from "../apps/web/src/lib/games/snake/constants";
+import { createInitialState, facingOf, queueDirection, start, step, tickMsFor } from "../apps/web/src/lib/games/snake/engine";
+import type { SnakeState } from "../apps/web/src/lib/games/snake/types";
 
 const running = (seed = 42) => start(createInitialState(seed));
 
